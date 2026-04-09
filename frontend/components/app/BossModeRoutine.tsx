@@ -328,6 +328,11 @@ export function BossModeRoutine() {
             <p className="mt-1 text-sm text-[var(--color-text-muted)]">
               Turn on 1–3 roles only. Boss Mode stays separate—you&apos;re not doing their work here.
             </p>
+            <p className="mt-2 text-xs text-[var(--color-text-faint)]">
+              <strong className="font-medium text-[var(--color-text-muted)]">Order matters:</strong>{' '}
+              the sequence you turn roles on is the default run order on the Overview (after your
+              starting role). Toggle off and back on to move a role later in the list.
+            </p>
             <div className="mt-4 flex flex-wrap gap-2">
               {sortedRoles.map((role) => {
                 const on = routine.activeRoleIds.includes(role.id)

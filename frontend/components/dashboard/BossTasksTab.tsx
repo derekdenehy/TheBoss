@@ -6,6 +6,7 @@ import { TaskDuration } from '@/components/app/TaskDuration'
 import { TaskDoneBurst } from '@/components/app/TaskDoneBurst'
 import { useAppState } from '@/context/AppStateContext'
 import { useTaskDoneCelebration } from '@/hooks/useTaskDoneCelebration'
+import { taskDepth } from '@/lib/taskTree'
 import type { TaskStatus } from '@/lib/types'
 
 export function BossTasksTab() {
@@ -84,12 +85,14 @@ export function BossTasksTab() {
                     } ${completingId === t.id && t.status !== 'done' ? 'task-row-completing' : ''}`}
                   >
                     <td className="px-4 py-3">
-                      <Link
-                        href={`/boss/role/${t.roleId}`}
-                        className="font-medium text-[var(--color-text-primary)] hover:text-sky-300"
-                      >
-                        {t.title}
-                      </Link>
+                      <div style={{ paddingLeft: `${Math.min(taskDepth(tasks, t), 8) * 12}px` }}>
+                        <Link
+                          href={`/boss/role/${t.roleId}`}
+                          className="font-medium text-[var(--color-text-primary)] hover:text-sky-300"
+                        >
+                          {t.title}
+                        </Link>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-[var(--color-text-muted)]">
                       {role?.name ?? '—'}

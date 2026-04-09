@@ -294,6 +294,7 @@ export function RoleWorkspace({ roleId }: Props) {
               onChangeStatus={(id, status) => updateTask(id, { status })}
               onEditTitle={(id, title) => updateTask(id, { title })}
               onDelete={(id) => deleteTask(id)}
+              onAddSubtask={(parentId, title) => addTask(roleId, title, { parentTaskId: parentId })}
             />
           )}
         </div>

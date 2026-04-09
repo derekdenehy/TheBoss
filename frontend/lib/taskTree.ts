@@ -96,7 +96,8 @@ export function taskDepth(tasks: Task[], task: Task): number {
   while (cur?.parentTaskId) {
     if (seen.has(cur.id)) break
     seen.add(cur.id)
-    cur = tasks.find((x) => x.id === cur.parentTaskId)
+    const parentId: string = cur.parentTaskId
+    cur = tasks.find((x) => x.id === parentId)
     if (cur) d += 1
     else break
   }

@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useMemo } from 'react'
 import { BOSS_MODULE_PRESETS } from '@/lib/bossModulePresets'
 import { useAppState } from '@/context/AppStateContext'
@@ -19,6 +20,10 @@ export function BossOverviewTab({ setTab }: Props) {
     updateBossDashboardModule,
     deleteBossDashboardModule,
     moveBossDashboardModule,
+    isBossDayCommitted,
+    todayBossRoutine,
+    getRoleById,
+    getActiveSessions,
   } = useAppState()
 
   const modulesSorted = useMemo(
@@ -26,8 +31,141 @@ export function BossOverviewTab({ setTab }: Props) {
     [bossDashboardModules]
   )
 
+  const roleRunOrder = useMemo(() => {
+    const r = todayBossRoutine
+    if (!r?.committedAt || r.activeRoleIds.length < 1) return null
+    const start = r.startingRoleId
+    const ordered =
+      start && r.activeRoleIds.includes(start)
+        ? [start, ...r.activeRoleIds.filter((id) => id !== start)]
+        : [...r.activeRoleIds]
+    return ordered.map((id, index) => ({
+      id,
+      role: getRoleById(id),
+      step: index + 1,
+      isStart: id === start,
+      switchText: (r.switchConditions[id] ?? '').trim(),
+    }))
+  }, [todayBossRoutine, getRoleById])
+
+  const clockedSessions = getActiveSessions()
+
   return (
     <div className="space-y-8">
+      {roleRunOrder ? (
+        <section className="panel-card border-sky-500/20 bg-sky-500/[0.04] p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">
+                Today&apos;s role order
+              </h2>
+              <p className="mt-1 max-w-xl text-xs text-[var(--color-text-muted)]">
+                Start with the first role, then move down the list. Each line uses your{' '}
+                <strong className="font-medium text-[var(--color-text-primary)]">switch rule</strong>{' '}
+                as the cue for when to change hats. Order matches Planning (start role first, then the
+                sequence you picked).
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setTab('planning')}
+              className="shrink-0 text-xs font-medium text-sky-300 hover:underline"
+            >
+              Edit in Planning →
+            </button>
+          </div>
+          {todayBossRoutine?.stateCheck.workingTime?.trim() && (
+            <p className="mt-3 rounded-lg border border-white/[0.06] bg-[var(--color-bg-deep)]/60 px-3 py-2 text-xs text-[var(--color-text-muted)]">
+              <span className="font-medium text-[var(--color-text-faint)]">Working window · </span>
+              {todayBossRoutine.stateCheck.workingTime.trim()}
+            </p>
+          )}
+          <ol className="mt-4 space-y-3">
+            {roleRunOrder.map(({ id, role, step, isStart, switchText }) => (
+              <li
+                key={id}
+                className="flex gap-3 rounded-xl border border-white/[0.06] bg-[var(--color-bg-deep)]/40 px-3 py-3 sm:gap-4"
+              >
+                <span
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-xs font-bold text-[var(--color-text-muted)]"
+                  aria-hidden
+                >
+                  {step}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link
+                      href={`/boss/role/${id}`}
+                      className="text-sm font-semibold text-sky-200 hover:underline"
+                    >
+                      {role?.name ?? 'Role'}
+                    </Link>
+                    {isStart && (
+                      <span className="rounded-md bg-sky-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-200/90">
+                        Start here
+                      </span>
+                    )}
+                  </div>
+                  {switchText ? (
+                    <p className="mt-1.5 text-xs leading-relaxed text-[var(--color-text-muted)]">
+                      <span className="text-[var(--color-text-faint)]">Switch when · </span>
+                      {switchText}
+                    </p>
+                  ) : (
+                    <p className="mt-1.5 text-[11px] text-[var(--color-text-faint)]">
+                      No switch rule yet — add one in Planning so you know when to leave this role.
+                    </p>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ol>
+          {clockedSessions.length > 0 && (
+            <div className="mt-4 border-t border-white/[0.06] pt-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-faint)]">
+                On the clock now
+              </p>
+              <ul className="mt-2 flex flex-wrap gap-2">
+                {clockedSessions.map((se) => {
+                  const ro = getRoleById(se.roleId)
+                  return (
+                    <li key={se.id}>
+                      <Link
+                        href={`/boss/role/${se.roleId}`}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-200/95 hover:border-emerald-400/50"
+                      >
+                        <span
+                          className="h-1.5 w-1.5 rounded-full"
+                          style={{ backgroundColor: ro?.color ?? '#34d399' }}
+                        />
+                        {ro?.name ?? 'Role'}
+                      </Link>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )}
+        </section>
+      ) : (
+        <section className="panel-card border-dashed border-white/15 p-5">
+          <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">
+            Today&apos;s role order
+          </h2>
+          <p className="mt-2 text-sm text-[var(--color-text-muted)]">
+            Commit your day in <strong className="text-[var(--color-text-primary)]">Planning</strong>{' '}
+            to get a numbered run order, start role, and switch rules on this screen.
+          </p>
+          <button
+            type="button"
+            onClick={() => setTab('planning')}
+            className="mt-4 rounded-xl bg-sky-500/90 px-4 py-2.5 text-sm font-semibold text-slate-950 hover:bg-sky-400"
+          >
+            Open Planning
+          </button>
+        </section>
+      )}
+
       <section>
         <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
           <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">KPIs</h2>

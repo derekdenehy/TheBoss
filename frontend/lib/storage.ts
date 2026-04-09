@@ -101,6 +101,13 @@ function normalizeTask(raw: unknown): Task | null {
       : undefined
   if (status !== 'in_progress') inProgressStartedAt = undefined
 
+  const parentRaw = (t as Task).parentTaskId
+  const parentTaskId =
+    typeof parentRaw === 'string' && parentRaw.trim() !== '' ? parentRaw : undefined
+  const sortRaw = (t as Task).sortOrder
+  const sortOrder =
+    typeof sortRaw === 'number' && !Number.isNaN(sortRaw) ? Math.floor(sortRaw) : undefined
+
   return {
     id: t.id,
     roleId: t.roleId,
@@ -109,6 +116,8 @@ function normalizeTask(raw: unknown): Task | null {
     createdAt: typeof t.createdAt === 'string' ? t.createdAt : new Date().toISOString(),
     updatedAt: typeof t.updatedAt === 'string' ? t.updatedAt : new Date().toISOString(),
     completedAt: typeof t.completedAt === 'string' ? t.completedAt : undefined,
+    ...(parentTaskId ? { parentTaskId } : {}),
+    ...(sortOrder !== undefined ? { sortOrder } : {}),
     briefingMeta:
       t.briefingMeta &&
       typeof t.briefingMeta === 'object' &&

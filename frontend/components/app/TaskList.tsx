@@ -2,6 +2,7 @@
 
 import { useTaskDoneCelebration } from '@/hooks/useTaskDoneCelebration'
 import type { Task, TaskStatus } from '@/lib/types'
+import { TaskDoneBurst } from './TaskDoneBurst'
 import { TaskDuration } from './TaskDuration'
 
 const STATUS_ORDER: TaskStatus[] = ['todo', 'in_progress', 'done']
@@ -28,7 +29,7 @@ export function TaskList({
   onDelete,
   startHereTaskId,
 }: Props) {
-  const { celebrateId, submitStatus } = useTaskDoneCelebration()
+  const { completingId, celebrateId, submitStatus } = useTaskDoneCelebration()
 
   const grouped = STATUS_ORDER.map((status) => ({
     status,
@@ -55,6 +56,8 @@ export function TaskList({
                       : ''
                   } ${
                     celebrateId === task.id && task.status === 'done' ? 'task-row-celebrate' : ''
+                  } ${
+                    completingId === task.id && task.status !== 'done' ? 'task-row-completing' : ''
                   }`}
                 >
                   <div className="min-w-0 flex-1">
@@ -70,7 +73,8 @@ export function TaskList({
                       aria-label="Task title"
                     />
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative flex min-h-[2.25rem] flex-wrap items-center gap-2 sm:justify-end">
+                    {completingId === task.id && task.status !== 'done' && <TaskDoneBurst />}
                     <TaskDuration task={task} className="min-w-[3rem] text-right" />
                     <select
                       className="rounded-lg border border-white/10 bg-[var(--color-bg-deep)] px-2 py-1.5 text-xs text-[var(--color-text-primary)] outline-none"

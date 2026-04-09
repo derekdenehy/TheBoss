@@ -155,23 +155,23 @@ body {
 .dot-bounce:nth-child(2) { animation: bounce-dots 1.2s ease-in-out infinite 0.2s; }
 .dot-bounce:nth-child(3) { animation: bounce-dots 1.2s ease-in-out infinite 0.4s; }
 
-/* Task marked done — quick satisfying pulse + success glow */
-@keyframes task-done-pop {
+/* Task marked done — flies into Done column then settles */
+@keyframes task-done-land {
   0% {
-    transform: scale(0.97);
-    opacity: 0.92;
+    transform: translateY(-14px) scale(0.92);
+    opacity: 0.72;
     filter: brightness(1);
   }
-  40% {
-    transform: scale(1.02);
+  38% {
+    transform: translateY(3px) scale(1.045);
     opacity: 1;
-    filter: brightness(1.08);
+    filter: brightness(1.14);
     box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--color-success) 45%, transparent),
-      0 10px 36px color-mix(in srgb, var(--color-success) 18%, transparent);
+      0 0 0 1px color-mix(in srgb, var(--color-success) 52%, transparent),
+      0 14px 44px color-mix(in srgb, var(--color-success) 26%, transparent);
   }
   100% {
-    transform: scale(1);
+    transform: translateY(0) scale(1);
     opacity: 1;
     filter: brightness(1);
     box-shadow: none;
@@ -181,7 +181,138 @@ body {
 .task-row-celebrate {
   position: relative;
   z-index: 1;
-  animation: task-done-pop 0.62s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: task-done-land 0.78s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Checkmark burst before row moves to Done */
+.task-done-burst-root {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin-top: -1.375rem;
+  z-index: 3;
+}
+
+.task-done-burst-root.task-done-burst--table {
+  right: 0.25rem;
+  top: 50%;
+  margin-top: -1.375rem;
+}
+
+.task-done-burst-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--color-success) 70%, transparent);
+  animation: task-done-burst-ring 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes task-done-burst-ring {
+  0% {
+    transform: scale(0.35);
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(2.35);
+    opacity: 0;
+  }
+}
+
+.task-done-burst-core {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-success) 58%, transparent);
+  color: var(--color-bg-deep);
+  animation: task-done-burst-core 0.52s cubic-bezier(0.34, 1.25, 0.64, 1) forwards;
+  box-shadow:
+    0 0 0 0 color-mix(in srgb, var(--color-success) 45%, transparent),
+    0 0 24px color-mix(in srgb, var(--color-success) 35%, transparent);
+}
+
+@keyframes task-done-burst-core {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  40% {
+    transform: scale(1.12);
+    opacity: 1;
+    box-shadow:
+      0 0 0 10px color-mix(in srgb, var(--color-success) 22%, transparent),
+      0 0 32px color-mix(in srgb, var(--color-success) 40%, transparent);
+  }
+  70% {
+    transform: scale(0.98);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.55);
+    opacity: 0;
+  }
+}
+
+.task-done-burst-check {
+  width: 15px;
+  height: 15px;
+}
+
+.task-done-burst-check-path {
+  stroke-dasharray: 22;
+  stroke-dashoffset: 22;
+  animation: task-done-burst-draw 0.32s cubic-bezier(0.22, 1, 0.36, 1) 0.05s forwards;
+}
+
+@keyframes task-done-burst-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.task-done-burst-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%;
+  background: var(--color-success);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--color-success) 85%, transparent);
+  opacity: 0;
+  animation: task-done-burst-particle 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: calc(var(--burst-i, 0) * 14ms);
+}
+
+@keyframes task-done-burst-particle {
+  0% {
+    opacity: 1;
+    transform: rotate(calc(var(--burst-i, 0) * 36deg)) translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(calc(var(--burst-i, 0) * 36deg)) translateY(-30px) scale(0.25);
+  }
+}
+
+.task-row-completing.panel-card {
+  overflow: visible;
+  opacity: 0.94;
+}
+
+tr.task-row-completing {
+  opacity: 0.94;
+}
+
+tr.task-row-completing td {
+  overflow: visible;
 }
 
 /* <tr> cannot animate transform reliably — use glow only */
@@ -203,7 +334,7 @@ body {
 tr.task-row-celebrate {
   position: static;
   z-index: auto;
-  animation: task-done-row 0.62s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: task-done-row 0.78s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 /* Boss routes: remap common Tailwind accent utilities to crimson family */
@@ -272,6 +403,11 @@ html[data-arena='boss'] .focus\:border-sky-500\/50:focus {
 
   .task-row-celebrate,
   tr.task-row-celebrate {
+    animation: none !important;
+  }
+
+  .task-done-burst-root,
+  .task-done-burst-root * {
     animation: none !important;
   }
 }

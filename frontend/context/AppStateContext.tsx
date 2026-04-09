@@ -15,6 +15,7 @@ import { createId } from '@/lib/ids'
 import { finalizeSessionSnapshot, usesRouteBilling } from '@/lib/sessionUtils'
 import { emptyDailyBossRoutine, getTodayKey } from '@/lib/dailyBoss'
 import { loadAppState, saveAppState } from '@/lib/storage'
+import { collectDescendantTaskIds, nextTaskSortOrder } from '@/lib/taskTree'
 import type {
   AppState,
   BossDashboardModule,
@@ -39,7 +40,11 @@ type AppActions = {
     patch: Partial<Pick<Role, 'name' | 'color' | 'icon' | 'hourlyRate'>>
   ) => boolean
   deleteRole: (id: string) => void
-  addTask: (roleId: string, title: string, briefingMeta?: TaskBriefingMeta) => void
+  addTask: (
+    roleId: string,
+    title: string,
+    options?: { briefingMeta?: TaskBriefingMeta; parentTaskId?: string }
+  ) => void
   updateTask: (
     id: string,
     patch: Partial<Pick<Task, 'title' | 'status' | 'dueAt'>>
@@ -350,21 +355,38 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const addTask = useCallback((roleId: string, title: string, briefingMeta?: TaskBriefingMeta) => {
-    const t = title.trim()
-    if (!t) return
-    const now = new Date().toISOString()
-    const task: Task = {
-      id: createId(),
-      roleId,
-      title: t,
-      status: 'todo',
-      createdAt: now,
-      updatedAt: now,
-      ...(briefingMeta ? { briefingMeta } : {}),
-    }
-    setState((s) => ({ ...s, tasks: [...s.tasks, task] }))
-  }, [])
+  const addTask = useCallback(
+    (
+      roleId: string,
+      title: string,
+      options?: { briefingMeta?: TaskBriefingMeta; parentTaskId?: string }
+    ) => {
+      const t = title.trim()
+      if (!t) return
+      setState((s) => {
+        const parentId = options?.parentTaskId
+        if (parentId) {
+          const parent = s.tasks.find((x) => x.id === parentId)
+          if (!parent || parent.roleId !== roleId) return s
+        }
+        const now = new Date().toISOString()
+        const sortOrder = nextTaskSortOrder(s.tasks, roleId, parentId)
+        const task: Task = {
+          id: createId(),
+          roleId,
+          title: t,
+          status: 'todo',
+          createdAt: now,
+          updatedAt: now,
+          sortOrder,
+          ...(parentId ? { parentTaskId: parentId } : {}),
+          ...(options?.briefingMeta ? { briefingMeta: options.briefingMeta } : {}),
+        }
+        return { ...s, tasks: [...s.tasks, task] }
+      })
+    },
+    []
+  )
 
   const updateTask = useCallback(
     (id: string, patch: Partial<Pick<Task, 'title' | 'status' | 'dueAt'>>) => {
@@ -426,7 +448,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   )
 
   const deleteTask = useCallback((id: string) => {
-    setState((s) => ({ ...s, tasks: s.tasks.filter((t) => t.id !== id) }))
+    setState((s) => {
+      const removeIds = new Set(collectDescendantTaskIds(s.tasks, id))
+      return { ...s, tasks: s.tasks.filter((t) => !removeIds.has(t.id)) }
+    })
   }, [])
 
   const finalizeSession = useCallback((session: Session): Session => {

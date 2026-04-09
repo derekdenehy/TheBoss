@@ -3,13 +3,14 @@
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { TaskDuration } from '@/components/app/TaskDuration'
+import { TaskDoneBurst } from '@/components/app/TaskDoneBurst'
 import { useAppState } from '@/context/AppStateContext'
 import { useTaskDoneCelebration } from '@/hooks/useTaskDoneCelebration'
 import type { TaskStatus } from '@/lib/types'
 
 export function BossTasksTab() {
   const { tasks, roles, getRoleById, updateTask } = useAppState()
-  const { celebrateId, submitStatus } = useTaskDoneCelebration()
+  const { completingId, celebrateId, submitStatus } = useTaskDoneCelebration()
   const [roleFilter, setRoleFilter] = useState<string>('')
   const [q, setQ] = useState('')
 
@@ -80,7 +81,7 @@ export function BossTasksTab() {
                     key={t.id}
                     className={`hover:bg-white/[0.02] ${
                       celebrateId === t.id && t.status === 'done' ? 'task-row-celebrate' : ''
-                    }`}
+                    } ${completingId === t.id && t.status !== 'done' ? 'task-row-completing' : ''}`}
                   >
                     <td className="px-4 py-3">
                       <Link
@@ -104,20 +105,25 @@ export function BossTasksTab() {
                     <td className="px-4 py-3">
                       <TaskDuration task={t} />
                     </td>
-                    <td className="px-4 py-3">
-                      <select
-                        value={t.status}
-                        onChange={(e) =>
-                          submitStatus(t.id, e.target.value as TaskStatus, (id, status) =>
-                            updateTask(id, { status })
-                          )
-                        }
-                        className="rounded-lg border border-white/10 bg-[var(--color-bg-deep)] px-2 py-1 text-xs text-[var(--color-text-primary)] outline-none"
-                      >
+                    <td className="relative px-4 py-3 align-middle">
+                      <div className="relative inline-flex min-h-[2.25rem] min-w-[7rem] items-center">
+                        {completingId === t.id && t.status !== 'done' && (
+                          <TaskDoneBurst className="task-done-burst--table" />
+                        )}
+                        <select
+                          value={t.status}
+                          onChange={(e) =>
+                            submitStatus(t.id, e.target.value as TaskStatus, (id, status) =>
+                              updateTask(id, { status })
+                            )
+                          }
+                          className="relative z-[1] rounded-lg border border-white/10 bg-[var(--color-bg-deep)] px-2 py-1 text-xs text-[var(--color-text-primary)] outline-none"
+                        >
                         <option value="todo">To do</option>
                         <option value="in_progress">In progress</option>
                         <option value="done">Done</option>
-                      </select>
+                        </select>
+                      </div>
                     </td>
                   </tr>
                 )

@@ -24,6 +24,10 @@ export type Task = {
   updatedAt: string
   completedAt?: string
   briefingMeta?: TaskBriefingMeta
+  /** Immediate parent task (same role); omit for top-level tasks. */
+  parentTaskId?: string
+  /** Order among siblings (same parent + role). */
+  sortOrder?: number
   /** Due date YYYY-MM-DD (local calendar day) */
   dueAt?: string
   /** Cumulative seconds spent while status was in_progress */

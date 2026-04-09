@@ -1,20 +1,39 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { TaskStatus } from '@/lib/types'
 
-const CELEBRATE_MS = 720
+/** Time task stays in old column while the check “explodes”. */
+const EXPLODE_MS = 480
+/** Landing pop in the Done section after status updates. */
+const LAND_CELEBRATE_MS = 780
+
+function prefersReducedMotion(): boolean {
+  if (typeof window === 'undefined') return false
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
 
 /**
- * Brief “completed” animation: set `celebrateId` when moving a task to done, then clear.
+ * Two-phase “done” animation: `completingId` (explosion at old row), then apply + `celebrateId` (land in Done).
  */
 export function useTaskDoneCelebration() {
+  const [completingId, setCompletingId] = useState<string | null>(null)
   const [celebrateId, setCelebrateId] = useState<string | null>(null)
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const explodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const landTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  useEffect(() => {
-    return () => {
-      if (timer.current) clearTimeout(timer.current)
+  const clearTimers = useCallback(() => {
+    if (explodeTimer.current) {
+      clearTimeout(explodeTimer.current)
+      explodeTimer.current = null
+    }
+    if (landTimer.current) {
+      clearTimeout(landTimer.current)
+      landTimer.current = null
     }
   }, [])
+
+  useEffect(() => {
+    return () => clearTimers()
+  }, [clearTimers])
 
   const submitStatus = useCallback(
     (
@@ -22,20 +41,42 @@ export function useTaskDoneCelebration() {
       next: TaskStatus,
       apply: (taskId: string, status: TaskStatus) => void
     ) => {
-      if (next === 'done') {
-        if (timer.current) clearTimeout(timer.current)
-        setCelebrateId(taskId)
+      if (next !== 'done') {
+        clearTimers()
+        setCompletingId(null)
+        setCelebrateId(null)
         apply(taskId, next)
-        timer.current = setTimeout(() => {
-          setCelebrateId(null)
-          timer.current = null
-        }, CELEBRATE_MS)
-      } else {
-        apply(taskId, next)
+        return
       }
+
+      clearTimers()
+      setCelebrateId(null)
+
+      if (prefersReducedMotion()) {
+        apply(taskId, next)
+        setCelebrateId(taskId)
+        landTimer.current = setTimeout(() => {
+          setCelebrateId(null)
+          landTimer.current = null
+        }, 280)
+        return
+      }
+
+      setCompletingId(taskId)
+
+      explodeTimer.current = setTimeout(() => {
+        explodeTimer.current = null
+        apply(taskId, next)
+        setCompletingId(null)
+        setCelebrateId(taskId)
+        landTimer.current = setTimeout(() => {
+          setCelebrateId(null)
+          landTimer.current = null
+        }, LAND_CELEBRATE_MS)
+      }, EXPLODE_MS)
     },
-    []
+    [clearTimers]
   )
 
-  return { celebrateId, submitStatus }
+  return { completingId, celebrateId, submitStatus }
 }

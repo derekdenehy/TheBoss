@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { formatCoins } from '@/lib/earnings'
 import { getTodayKey } from '@/lib/dailyBoss'
 import { useAppState } from '@/context/AppStateContext'
@@ -31,14 +31,20 @@ export function RoleWorkspace({ roleId }: Props) {
     liveTotalCurrency,
     tasksCompletedDuringSession,
     deleteRole,
+    updateRole,
     todayBossRoutine,
   } = useAppState()
 
   const [newTitle, setNewTitle] = useState('')
+  const [nameEdit, setNameEdit] = useState('')
   const [summarySession, setSummarySession] = useState<Session | null>(null)
 
   const role = getRoleById(roleId)
   const todayKey = getTodayKey()
+
+  useEffect(() => {
+    if (role) setNameEdit(role.name)
+  }, [role?.id, role?.name])
 
   const tasks = useMemo(() => {
     const list = getTasksForRole(roleId)
@@ -77,6 +83,21 @@ export function RoleWorkspace({ roleId }: Props) {
       return
     }
     clockIn(roleId)
+  }
+
+  const commitRoleName = () => {
+    if (!role) return
+    const next = nameEdit.trim()
+    if (next === role.name) return
+    if (!next) {
+      setNameEdit(role.name)
+      return
+    }
+    const ok = updateRole(roleId, { name: next })
+    if (!ok) {
+      setNameEdit(role.name)
+      window.alert('Could not rename: choose a unique name.')
+    }
   }
 
   const handleDeleteRole = () => {
@@ -132,8 +153,27 @@ export function RoleWorkspace({ roleId }: Props) {
               >
                 {role.icon || '◆'}
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{role.name}</h1>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
+                  <input
+                    className="w-full max-w-xl bg-transparent text-2xl font-bold text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-faint)] focus:ring-2 focus:ring-sky-500/35 rounded-md -mx-1 px-1"
+                    value={nameEdit}
+                    onChange={(e) => setNameEdit(e.target.value)}
+                    onBlur={commitRoleName}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        ;(e.target as HTMLInputElement).blur()
+                      }
+                      if (e.key === 'Escape') {
+                        setNameEdit(role.name)
+                        ;(e.target as HTMLInputElement).blur()
+                      }
+                    }}
+                    aria-label="Role name"
+                    spellCheck={false}
+                  />
+                </h1>
                 <p className="text-sm text-[var(--color-text-muted)]">
                   {role.hourlyRate} coins/hour while clocked in
                 </p>

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { ActiveSessionsStrip } from '../app/ActiveSessionsStrip'
 import { BossModeRoutine } from '../app/BossModeRoutine'
 import { CurrencyBadge } from '../app/CurrencyBadge'
 import { useAppState } from '@/context/AppStateContext'
@@ -11,12 +10,10 @@ import type { BossTab } from './bossDashboardTabs'
 import { BossCalendarTab } from './BossCalendarTab'
 import { BossKpisTab } from './BossKpisTab'
 import { BossOverviewTab } from './BossOverviewTab'
-import { BossRolesTab } from './BossRolesTab'
 import { BossTasksTab } from './BossTasksTab'
 
 const TABS: { id: BossTab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
-  { id: 'roles', label: 'Roles' },
   { id: 'tasks', label: 'Tasks' },
   { id: 'calendar', label: 'Calendar' },
   { id: 'kpis', label: 'KPIs' },
@@ -64,10 +61,6 @@ export function BossDashboard() {
         <CurrencyBadge amount={liveTotalCurrency()} />
       </header>
 
-      <div className="mt-6">
-        <ActiveSessionsStrip />
-      </div>
-
       {roles.length === 0 ? (
         <div className="mt-12 rounded-2xl border border-white/[0.06] bg-[var(--color-bg-panel)]/40 px-8 py-12 text-center">
           <p className="text-sm text-[var(--color-text-muted)]">
@@ -99,7 +92,6 @@ export function BossDashboard() {
 
           <div className="mt-8">
             {tab === 'overview' && <BossOverviewTab setTab={setTab} />}
-            {tab === 'roles' && <BossRolesTab />}
             {tab === 'tasks' && <BossTasksTab />}
             {tab === 'calendar' && <BossCalendarTab />}
             {tab === 'kpis' && <BossKpisTab />}

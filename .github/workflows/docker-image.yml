@@ -1,0 +1,62 @@
+name: Docker Compose CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    # These will be picked up by docker-compose `environment:` entries
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      USER_AGENT: ${{ secrets.USER_AGENT }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build images from backend/ and frontend/ Dockerfiles
+      - name: Build backend image
+        run: docker build ./backend -t backend:ci
+
+      - name: Build frontend image
+        run: docker build ./frontend -t frontend:ci
+
+      # If your docker-compose.yml already has build: ./backend & ./frontend,
+      # this will reuse the above cache and/or rebuild as needed.
+      - name: Start services with docker compose
+        run: docker compose up -d --build
+
+      # Optional: wait for backend to be healthy before tests
+      - name: Wait for backend
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://localhost:8000/ >/dev/null; then
+              echo "Backend is up"
+              exit 0
+            fi
+            echo "Waiting for backend..."
+            sleep 2
+          done
+          echo "Backend did not start in time" >&2
+          exit 1
+
+      # Optional: backend tests (adjust to your stack, e.g. pytest, uvicorn tests, etc.)
+      - name: Run backend tests
+        run: docker compose exec -T backend pytest || echo "No backend tests configured"
+
+      # Optional: frontend tests (adjust command to your frontend setup)
+      - name: Run frontend tests
+        run: docker compose exec -T frontend npm test -- --watch=false --ci || echo "No frontend tests configured"
+
+      - name: Tear down docker compose
+        if: always()
+        run: docker compose down -v

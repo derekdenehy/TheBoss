@@ -1,0 +1,158 @@
+export type TaskStatus = 'todo' | 'in_progress' | 'done'
+
+export type Role = {
+  id: string
+  name: string
+  color?: string
+  icon?: string
+  hourlyRate: number
+  createdAt: string
+}
+
+/** Set when task was created from today's Boss packet (for ordering / “start here”). */
+export type TaskBriefingMeta = {
+  date: string
+  order: number
+}
+
+export type Task = {
+  id: string
+  roleId: string
+  title: string
+  status: TaskStatus
+  createdAt: string
+  updatedAt: string
+  completedAt?: string
+  briefingMeta?: TaskBriefingMeta
+  /** Due date YYYY-MM-DD (local calendar day) */
+  dueAt?: string
+  /** Cumulative seconds spent while status was in_progress */
+  totalSecondsSpent?: number
+  /** When the current in_progress stint started (ISO); cleared when pausing or completing */
+  inProgressStartedAt?: string
+}
+
+export type Session = {
+  id: string
+  roleId: string
+  startTime: string
+  endTime?: string
+  durationSeconds?: number
+  earnings?: number
+  active: boolean
+  /**
+   * When set, elapsed time only grows while this role’s `/boss/role/:id` tab is open
+   * (multi clock-in). Omitted on older active sessions = wall-clock until clock-out.
+   */
+  billableMsAccrued?: number
+}
+
+/** The single outcome you care about most (e.g. gym app daily active users). */
+export type NorthStarMetric = {
+  /** e.g. "Daily active users" — empty until you set it */
+  label: string
+  /** null = not entered yet */
+  value: number | null
+}
+
+/** One workday’s Boss Mode plan: state check → outcomes → active roles → packets → start role → switch rules. */
+export type DailyBossRoutine = {
+  date: string
+  stateCheck: {
+    unfinishedFromYesterday: string
+    urgent: string
+    blocked: string
+    energy: '' | 'low' | 'medium' | 'high'
+    workingTime: string
+  }
+  /** 1–3 meaningful results for the day */
+  outcomes: string[]
+  /** Worker roles “on” today (usually 2–3) */
+  activeRoleIds: string[]
+  /** Per role: remove friction + concrete packet lines (applied as tasks on commit) */
+  rolePackets: Record<string, { frictionNote: string; taskLines: string[] }>
+  startingRoleId: string | null
+  /** Free-text exit / switch rules per role id */
+  switchConditions: Record<string, string>
+  /** ISO timestamp when packets were applied; null = still in planning */
+  committedAt: string | null
+}
+
+export type CalendarEvent = {
+  id: string
+  title: string
+  /** ISO datetime (e.g. from Date.toISOString() or datetime-local parsed) */
+  startsAt: string
+  endsAt?: string
+  location?: string
+  notes?: string
+  createdAt: string
+}
+
+export type KpiDefinition = {
+  id: string
+  label: string
+  color?: string
+  createdAt: string
+}
+
+export type KpiEntry = {
+  id: string
+  kpiId: string
+  /** YYYY-MM-DD */
+  date: string
+  value: number
+  createdAt: string
+}
+
+/** Aligns with presets in `bossModulePresets.ts` for future plug-in behavior. */
+export type BossModuleTemplateKey =
+  | 'custom'
+  | 'email_triage'
+  | 'state_snapshot'
+  | 'calendar_scan'
+  | 'role_planning_hint'
+
+/** User-built daily dashboard cards (optional templates via templateKey). */
+export type BossDashboardModule = {
+  id: string
+  title: string
+  body: string
+  templateKey?: BossModuleTemplateKey
+  sortOrder: number
+}
+
+export type AppState = {
+  roles: Role[]
+  tasks: Task[]
+  sessions: Session[]
+  activeSessionId: string | null
+  totalCurrency: number
+  /** Cumulative ms spent in the Boss workspace (`/boss`); coins bank when you leave. */
+  bossWindowMsAccrued: number
+  northStar: NorthStarMetric
+  bossDailyRoutine: DailyBossRoutine | null
+  calendarEvents: CalendarEvent[]
+  kpiDefinitions: KpiDefinition[]
+  kpiEntries: KpiEntry[]
+  bossDashboardModules: BossDashboardModule[]
+}
+
+export const DEFAULT_HOURLY_RATE = 20
+
+export function emptyAppState(): AppState {
+  return {
+    roles: [],
+    tasks: [],
+    sessions: [],
+    activeSessionId: null,
+    totalCurrency: 0,
+    bossWindowMsAccrued: 0,
+    northStar: { label: '', value: null },
+    bossDailyRoutine: null,
+    calendarEvents: [],
+    kpiDefinitions: [],
+    kpiEntries: [],
+    bossDashboardModules: [],
+  }
+}

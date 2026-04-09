@@ -1,0 +1,277 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-bg-deep: #080b12;
+  --color-bg-panel: #0f1218;
+  --color-bg-panel-border: rgba(255, 255, 255, 0.07);
+  --color-panel-card-bg: rgba(15, 18, 30, 0.85);
+  --color-accent: #7dd3fc;
+  --color-accent-dim: #38bdf8;
+  --color-accent-glow: rgba(125, 211, 252, 0.12);
+  --color-success: #86efac;
+  --color-text-primary: #f0f4f8;
+  --color-text-muted: #64748b;
+  --color-text-faint: #334155;
+  --boss-radial-spot: rgba(56, 189, 248, 0.1);
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* Boss workspace (/boss): dark crimson / blood-red atmosphere */
+.boss-ambient-gradient {
+  background: radial-gradient(
+    ellipse 120% 80% at 50% -20%,
+    var(--boss-radial-spot),
+    transparent 50%
+  );
+}
+
+.boss-dash-tab-active {
+  background: color-mix(in srgb, var(--color-accent-dim) 24%, transparent);
+  color: var(--color-text-primary);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent-dim) 32%, transparent);
+}
+
+html[data-arena='boss'] {
+  --color-bg-deep: #0a0506;
+  --color-bg-panel: #14080b;
+  --color-bg-panel-border: rgba(220, 60, 60, 0.14);
+  --color-panel-card-bg: rgba(28, 10, 12, 0.88);
+  --color-accent: #f87171;
+  --color-accent-dim: #dc2626;
+  --color-accent-glow: rgba(220, 38, 38, 0.2);
+  --color-text-primary: #f8eded;
+  --color-text-muted: #a8a29e;
+  --color-text-faint: #57534e;
+  --boss-radial-spot: rgba(153, 27, 27, 0.22);
+}
+
+html,
+body {
+  background: var(--color-bg-deep);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-family: 'Inter', system-ui, sans-serif;
+  scroll-behavior: smooth;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Panel glass card base */
+.panel-card {
+  background: var(--color-panel-card-bg);
+  border: 1px solid var(--color-bg-panel-border);
+  border-radius: 12px;
+  backdrop-filter: blur(16px);
+  box-shadow:
+    0 4px 32px rgba(0, 0, 0, 0.5),
+    0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  position: relative;
+  overflow: hidden;
+}
+
+.panel-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08) 40%, rgba(255,255,255,0.08) 60%, transparent);
+  pointer-events: none;
+}
+
+/* Active panel glow */
+.panel-active {
+  border-color: color-mix(in srgb, var(--color-accent-dim) 35%, transparent);
+  box-shadow:
+    0 4px 32px rgba(0, 0, 0, 0.5),
+    0 0 0 1px color-mix(in srgb, var(--color-accent-dim) 22%, transparent),
+    0 0 32px var(--color-accent-glow);
+}
+
+/* Panel header bar */
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+/* Typing cursor blink */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.typing-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 14px;
+  background: var(--color-accent);
+  margin-left: 2px;
+  vertical-align: middle;
+  animation: blink 1s step-end infinite;
+}
+
+/* Placeholder slot pulse */
+@keyframes slot-pulse {
+  0%, 100% { border-color: rgba(125, 211, 252, 0.15); }
+  50% { border-color: rgba(125, 211, 252, 0.4); }
+}
+
+.figure-slot-pulse {
+  animation: slot-pulse 2s ease-in-out infinite;
+}
+
+/* Progress dots */
+@keyframes bounce-dots {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+  40% { transform: translateY(-4px); opacity: 1; }
+}
+
+.dot-bounce:nth-child(1) { animation: bounce-dots 1.2s ease-in-out infinite 0s; }
+.dot-bounce:nth-child(2) { animation: bounce-dots 1.2s ease-in-out infinite 0.2s; }
+.dot-bounce:nth-child(3) { animation: bounce-dots 1.2s ease-in-out infinite 0.4s; }
+
+/* Task marked done — quick satisfying pulse + success glow */
+@keyframes task-done-pop {
+  0% {
+    transform: scale(0.97);
+    opacity: 0.92;
+    filter: brightness(1);
+  }
+  40% {
+    transform: scale(1.02);
+    opacity: 1;
+    filter: brightness(1.08);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--color-success) 45%, transparent),
+      0 10px 36px color-mix(in srgb, var(--color-success) 18%, transparent);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+    filter: brightness(1);
+    box-shadow: none;
+  }
+}
+
+.task-row-celebrate {
+  position: relative;
+  z-index: 1;
+  animation: task-done-pop 0.62s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* <tr> cannot animate transform reliably — use glow only */
+@keyframes task-done-row {
+  0% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+  45% {
+    background-color: color-mix(in srgb, var(--color-success) 14%, transparent);
+    box-shadow: inset 3px 0 0 0 color-mix(in srgb, var(--color-success) 55%, transparent);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+}
+
+tr.task-row-celebrate {
+  position: static;
+  z-index: auto;
+  animation: task-done-row 0.62s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Boss routes: remap common Tailwind accent utilities to crimson family */
+html[data-arena='boss'] .text-sky-200 {
+  color: rgb(254 202 202) !important;
+}
+
+html[data-arena='boss'] .text-sky-300,
+html[data-arena='boss'] .text-sky-400 {
+  color: rgb(252 165 165) !important;
+}
+
+html[data-arena='boss'] .text-sky-400\/80 {
+  color: rgb(248 113 113 / 0.85) !important;
+}
+
+html[data-arena='boss'] .text-sky-200\/90 {
+  color: rgb(254 202 202 / 0.9) !important;
+}
+
+html[data-arena='boss'] .text-sky-100 {
+  color: rgb(254 226 226) !important;
+}
+
+html[data-arena='boss'] .bg-sky-500\/90,
+html[data-arena='boss'] .bg-sky-500\/20 {
+  background-color: color-mix(in srgb, rgb(220 38 38) 88%, transparent) !important;
+}
+
+html[data-arena='boss'] button.bg-sky-500\/90:hover,
+html[data-arena='boss'] a.bg-sky-500\/90:hover {
+  background-color: rgb(239 68 68) !important;
+}
+
+html[data-arena='boss'] .border-sky-400\/70,
+html[data-arena='boss'] .border-sky-500\/25,
+html[data-arena='boss'] .border-sky-500\/30,
+html[data-arena='boss'] .border-sky-500\/35,
+html[data-arena='boss'] .border-sky-500\/40,
+html[data-arena='boss'] .border-sky-500\/50 {
+  border-color: color-mix(in srgb, rgb(248 113 113) 45%, transparent) !important;
+}
+
+html[data-arena='boss'] .ring-sky-400\/40,
+html[data-arena='boss'] .ring-sky-500\/50 {
+  --tw-ring-color: rgb(248 113 113 / 0.45) !important;
+}
+
+html[data-arena='boss'] .hover\:border-sky-500\/40:hover {
+  border-color: color-mix(in srgb, rgb(248 113 113) 40%, transparent) !important;
+}
+
+html[data-arena='boss'] .focus\:border-sky-500\/30:focus,
+html[data-arena='boss'] .focus\:border-sky-500\/35:focus,
+html[data-arena='boss'] .focus\:border-sky-500\/40:focus,
+html[data-arena='boss'] .focus\:border-sky-500\/50:focus {
+  border-color: color-mix(in srgb, rgb(248 113 113) 45%, transparent) !important;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .task-row-celebrate,
+  tr.task-row-celebrate {
+    animation: none !important;
+  }
+}

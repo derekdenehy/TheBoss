@@ -1,0 +1,18 @@
+# Requirements for running crawl_canvas_to_supabase.py and login_once.py
+# 
+# To install:
+#   pip install -r requirements.txt
+#
+# Note: After installing playwright, you also need to install browser binaries:
+#   playwright install chromium
+
+# Browser automation for Canvas scraping
+playwright>=1.40.0
+
+# HTTP requests for downloading files and API calls
+requests>=2.31.0
+
+# Environment variable management (optional but recommended)
+# Allows loading .env files for SUPABASE_ANON_KEY, SUPABASE_URL, etc.
+python-dotenv>=1.0.0
+

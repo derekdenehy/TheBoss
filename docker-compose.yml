@@ -1,0 +1,24 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - USER_AGENT=${USER_AGENT:-Course-Sidekick-v1.0}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+    env_file:
+      - .env
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=
+      - CHOKIDAR_USEPOLLING=true
+    depends_on:
+      - backend
+    stdin_open: true
+    tty: true

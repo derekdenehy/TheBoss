@@ -209,6 +209,11 @@ function migrateSessionsBilling(raw: unknown[], nowMs: number): Session[] {
   })
 }
 
+/** Parse app state from localStorage JSON or Supabase `state` jsonb. */
+export function parseAppStateFromUnknown(parsed: unknown): AppState {
+  return normalizeState(parsed)
+}
+
 function normalizeState(parsed: unknown): AppState {
   if (!parsed || typeof parsed !== 'object') return emptyAppState()
   const p = parsed as AppState
@@ -269,7 +274,7 @@ export function loadAppState(): AppState {
   if (typeof window === 'undefined') return emptyAppState()
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    const base = raw ? normalizeState(JSON.parse(raw)) : emptyAppState()
+    const base = raw ? parseAppStateFromUnknown(JSON.parse(raw)) : emptyAppState()
     return base
   } catch {
     return emptyAppState()

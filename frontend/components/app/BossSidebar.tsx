@@ -1,9 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import { useAppState } from '@/context/AppStateContext'
+import { useBrowserPathname } from '@/hooks/useBrowserPathname'
 import { CreateRoleModal } from './CreateRoleModal'
 
 function ClockedInIcon({ className = '' }: { className?: string }) {
@@ -27,8 +27,17 @@ function ClockedInIcon({ className = '' }: { className?: string }) {
 }
 
 export function BossSidebar() {
-  const pathname = usePathname()
-  const { roles, sessions, addRole, todayBossRoutine, isBossDayCommitted } = useAppState()
+  const pathname = useBrowserPathname()
+  const {
+    roles,
+    sessions,
+    addRole,
+    todayBossRoutine,
+    isBossDayCommitted,
+    supabaseConfigured,
+    authUser,
+    signOut,
+  } = useAppState()
   const [createOpen, setCreateOpen] = useState(false)
 
   const clockedRoleIds = useMemo(
@@ -145,6 +154,32 @@ export function BossSidebar() {
         >
           + New role
         </button>
+
+        {supabaseConfigured && (
+          <div className="mt-4 space-y-2 border-t border-white/[0.06] pt-4 text-[10px] text-[var(--color-text-muted)]">
+            {authUser?.email ? (
+              <>
+                <p className="truncate px-1 text-[var(--color-text-faint)]" title={authUser.email}>
+                  {authUser.email}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void signOut()}
+                  className="w-full rounded-lg py-2 text-[var(--color-text-muted)] transition hover:bg-white/[0.04] hover:text-[var(--color-text-primary)]"
+                >
+                  Sign out
+                </button>
+              </>
+            ) : (
+              <Link
+                href="/login"
+                className="block w-full rounded-lg py-2 text-center text-sky-400/90 transition hover:bg-white/[0.04] hover:text-sky-300"
+              >
+                Sign in to sync
+              </Link>
+            )}
+          </div>
+        )}
 
         <Link
           href="/"

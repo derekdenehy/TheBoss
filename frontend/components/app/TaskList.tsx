@@ -79,6 +79,10 @@ export function TaskList({
                       className="w-full bg-transparent text-sm text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-faint)]"
                       value={task.title}
                       onChange={(e) => onEditTitle(task.id, e.target.value)}
+                      onBlur={() => {
+                        const t = task.title.trim()
+                        if (t !== task.title) onEditTitle(task.id, t)
+                      }}
                       aria-label="Task title"
                     />
                     {subtaskParentId === task.id && (

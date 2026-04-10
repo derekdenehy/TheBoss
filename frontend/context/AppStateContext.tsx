@@ -14,7 +14,10 @@ import { earningsForElapsedSeconds } from '@/lib/earnings'
 import { createId } from '@/lib/ids'
 import { finalizeSessionSnapshot, usesRouteBilling } from '@/lib/sessionUtils'
 import { emptyDailyBossRoutine, getTodayKey } from '@/lib/dailyBoss'
-import { loadAppState, saveAppState } from '@/lib/storage'
+import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { isSupabaseConfigured } from '@/lib/supabase/env'
+import { fetchBossAppStateJson, upsertBossAppState } from '@/lib/supabase/sync'
+import { loadAppState, parseAppStateFromUnknown, saveAppState } from '@/lib/storage'
 import { collectDescendantTaskIds, nextTaskSortOrder } from '@/lib/taskTree'
 import type {
   AppState,
@@ -107,6 +110,9 @@ type AppActions = {
   liveBossWindowStintEarnings: () => number
   /** `totalCurrency` plus pending coins from the current Boss visit. */
   liveTotalCurrency: () => number
+  supabaseConfigured: boolean
+  authUser: { email?: string } | null
+  signOut: () => Promise<void>
 }
 
 const AppStateContext = createContext<(AppState & AppActions & { hydrated: boolean }) | null>(
@@ -122,6 +128,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const bossWindowSegmentStartedAtRef = useRef<number | null>(null)
   const billingFocusRoleIdRef = useRef<string | null>(null)
   const billingSegmentStartedAtRef = useRef<number | null>(null)
+  const cloudUserIdRef = useRef<string | null>(null)
+  const [authUser, setAuthUser] = useState<{ email?: string } | null>(null)
 
   const syncBillingFocusFromPath = useCallback((pathname: string | null) => {
     const m = pathname?.match(/^\/boss\/role\/([^/]+)/)
@@ -166,14 +174,111 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    setState(loadAppState())
-    setHydrated(true)
+    let cancelled = false
+    const subRef: { current: { unsubscribe: () => void } | null } = { current: null }
+
+    const finishLocalOnly = () => {
+      setState(loadAppState())
+      cloudUserIdRef.current = null
+      setAuthUser(null)
+      setHydrated(true)
+    }
+
+    if (!isSupabaseConfigured()) {
+      finishLocalOnly()
+      return () => {
+        cancelled = true
+      }
+    }
+
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) {
+      finishLocalOnly()
+      return () => {
+        cancelled = true
+      }
+    }
+
+    const applySession = async (user: { id: string; email?: string | null } | null) => {
+      if (cancelled) return
+      if (!user) {
+        cloudUserIdRef.current = null
+        setAuthUser(null)
+        setState(loadAppState())
+        return
+      }
+      cloudUserIdRef.current = user.id
+      setAuthUser({ email: user.email ?? undefined })
+      const json = await fetchBossAppStateJson(supabase, user.id)
+      if (cancelled) return
+      const local = loadAppState()
+      if (json !== null) {
+        const remote = parseAppStateFromUnknown(json)
+        const remoteEmpty =
+          remote.roles.length === 0 &&
+          remote.tasks.length === 0 &&
+          remote.sessions.length === 0
+        const localHasData =
+          local.roles.length > 0 || local.tasks.length > 0 || local.sessions.length > 0
+        if (remoteEmpty && localHasData) {
+          setState(local)
+          await upsertBossAppState(supabase, user.id, local)
+        } else {
+          setState(remote)
+        }
+      } else {
+        setState(local)
+        await upsertBossAppState(supabase, user.id, local)
+      }
+    }
+
+    ;(async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (cancelled) return
+
+      if (!session?.user) {
+        cloudUserIdRef.current = null
+        setAuthUser(null)
+        setState(loadAppState())
+      } else {
+        await applySession(session.user)
+      }
+      if (cancelled) return
+      setHydrated(true)
+
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
+        if (cancelled) return
+        if (event === 'INITIAL_SESSION') return
+        if (event === 'SIGNED_OUT') {
+          await applySession(null)
+        } else if (event === 'SIGNED_IN' && nextSession?.user) {
+          await applySession(nextSession.user)
+        }
+      })
+      subRef.current = subscription
+    })()
+
+    return () => {
+      cancelled = true
+      subRef.current?.unsubscribe()
+    }
   }, [])
 
   useEffect(() => {
     if (!hydrated) return
     if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => saveAppState(state), 120)
+    saveTimer.current = setTimeout(() => {
+      saveAppState(state)
+      const uid = cloudUserIdRef.current
+      const supabase = getSupabaseBrowserClient()
+      if (uid && supabase) {
+        void upsertBossAppState(supabase, uid, state)
+      }
+    }, 120)
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current)
     }
@@ -429,7 +534,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           }
 
           let title = t.title
-          if (patch.title !== undefined) title = patch.title.trim()
+          // Do not trim on every keystroke — trailing spaces are normal while typing;
+          // trimming here made spaces impossible in controlled task title inputs.
+          if (patch.title !== undefined) title = patch.title
 
           return {
             ...t,
@@ -824,6 +931,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     [state.tasks]
   )
 
+  const signOut = useCallback(async () => {
+    const supabase = getSupabaseBrowserClient()
+    if (supabase) await supabase.auth.signOut()
+    else {
+      cloudUserIdRef.current = null
+      setAuthUser(null)
+      setState(loadAppState())
+    }
+  }, [])
+
   const value = useMemo(
     () => ({
       ...state,
@@ -868,10 +985,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       liveBossWindowSeconds,
       liveBossWindowStintEarnings,
       liveTotalCurrency,
+      supabaseConfigured: isSupabaseConfigured(),
+      authUser,
+      signOut,
     }),
     [
       state,
       hydrated,
+      authUser,
       addRole,
       updateRole,
       deleteRole,
@@ -912,6 +1033,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       liveBossWindowSeconds,
       liveBossWindowStintEarnings,
       liveTotalCurrency,
+      signOut,
     ]
   )
 

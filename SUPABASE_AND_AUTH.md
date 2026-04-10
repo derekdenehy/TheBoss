@@ -8,7 +8,7 @@ You don’t need to know any of this to run the app. This file explains what the
 
 - **Supabase** = A free online service that gives you:
   - A **database** (where the app can store things like your courses and files).
-  - **Auth** = “who is using the app?” — sign up, sign in, sign out (email + password, or magic link).
+  - **Auth** = “who is using the app?” — sign up, sign in, sign out (**The Boss** uses email + password on `/login`).
 
 - **Auth** in this project = The app can show a **login/sign-up page**. After you sign in, it knows “this is you” and can tie your data (courses, files) to your account.
 

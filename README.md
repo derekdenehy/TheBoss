@@ -1,13 +1,76 @@
 # The Boss
 
-**The Boss** is a local-first productivity app for working in **roles** (contexts or “jobs”), managing **tasks**, and **clocking in** to one role at a time. Data for the MVP lives in the browser (**`localStorage`**); you do not need the Python backend to use the main UI.
+**The Boss** is a local-first productivity app for working in **roles** (contexts or “jobs”), managing **tasks**, and **clocking in** to one role at a time. By default, data stays in the browser (**`localStorage`**). **Optional [Supabase](https://supabase.com)** sync lets you sign in with **email and password** and persist the same JSON state in your project’s database; you do not need the Python backend for either mode.
 
 | Route | What it is |
 |-------|------------|
 | **`/`** | Progress landing — optional “north star” number and label, link into the app |
 | **`/boss`** | Main dashboard — roles, tasks, sessions, calendar-style views, KPIs |
+| **`/login`** | Sign in with Supabase (only used when env vars are set) |
 
-On first launch, three starter roles are created: **Programmer**, **Marketing**, and **Student** (you can rename, add, or remove them).
+### Optional: Supabase (cloud sync)
+
+Assume you already created a Supabase **project** and can open its dashboard.
+
+#### 1. Copy your API URL and anon key (for `.env.local`)
+
+1. In the Supabase dashboard, open **your project** (not the org home screen).
+2. Click the **gear icon** (**Project Settings**) in the left sidebar.
+3. Click **API** (under *Project Settings*).
+4. Find **Project URL** — looks like `https://abcdefgh.supabase.co`. Copy it. This value is your `NEXT_PUBLIC_SUPABASE_URL`.
+5. On the same page, under **Project API keys**, copy the **`anon` `public`** key (not the `service_role` key). That is your `NEXT_PUBLIC_SUPABASE_ANON_KEY`.  
+   The anon key is safe to put in frontend env vars; RLS on your tables restricts what each user can read/write.
+
+#### 2. Authentication → URL Configuration
+
+Supabase only allows the browser to be sent back to URLs you list here. That matters for **email confirmation** (if enabled) and any flow that returns through `/auth/callback`.
+
+1. **Authentication** → **URL Configuration**.
+2. **Site URL** → `http://localhost:3000` (or your deployed URL later).
+3. **Redirect URLs** → add `http://localhost:3000/auth/callback` (and your production callback when you deploy).
+4. Save if prompted.
+
+#### 3. Turn on email + password
+
+1. **Authentication** → **Providers** → **Email**.
+2. Turn **Email provider** on.
+3. Ensure users can sign up with a password (defaults usually allow **email + password**; disable “magic link only” style restrictions if your project had that).
+4. For **higher conversion** (no inbox step on sign-up): turn **Confirm email** **off** so new accounts get a session immediately after **Create account**. If you leave it **on**, users must click the confirmation email before they can sign in.
+5. Google/GitHub are optional.
+
+#### 4. Create the database table (SQL migration)
+
+1. In the left sidebar, click **SQL Editor**.
+2. Click **New query**.
+3. Open [`frontend/supabase/migrations/001_boss_app_state.sql`](frontend/supabase/migrations/001_boss_app_state.sql) in your editor, copy **all** of its contents, paste into the Supabase SQL Editor, and click **Run**.
+4. You should see success. Under **Table Editor**, you should eventually see a table **`boss_app_state`** after you sign in and use the app (or you can confirm it exists in the *Database* → *Tables* view).
+
+#### 5. Wire env vars into the Next.js app
+
+There is **no** committed `.env` or `.env.local` in the repo on purpose (those files hold secrets and are **gitignored**). You create `.env.local` yourself next to the template.
+
+1. Open the **`frontend`** folder in your project.
+2. Find **[`frontend/supabase.env.template`](frontend/supabase.env.template)** — this file is safe to commit and only contains placeholders.
+3. **Copy** that file and save the copy as **`frontend/.env.local`** (leading dot, no `.txt` extension). In VS Code / Cursor: *File → New File*, save as `.env.local` in `frontend/`, or duplicate the template and rename.
+4. Replace the two lines:
+
+   - `PASTE_YOUR_PROJECT_URL_HERE` → your Supabase **Project URL** (from step 1).
+   - `PASTE_YOUR_ANON_KEY_HERE` → your **`anon` `public`** key.
+
+   No quotes needed around the values.
+
+5. Stop and restart **`npm run dev`** so Next.js loads `.env.local`.
+
+*(Alternative: copy [`frontend/.env.example`](frontend/.env.example) to `.env.local` instead — same variables.)*
+
+#### 6. Try it in the app
+
+1. Open **http://localhost:3000/boss**.
+2. Sidebar → **Sign in to sync** → **`/login`**.
+3. **Create account** (email + password) or **Sign in**. You should land on `/boss` signed in when confirmation email is off (or after you confirm, if it’s on).
+4. **Table Editor** → **`boss_app_state`** should gain a row after you use the app.
+
+If redirects after an email (confirmation, etc.) fail, re-check **Redirect URLs** and that you use the same host as **Site URL** (`localhost` vs `127.0.0.1`).
 
 ---
 
@@ -73,6 +136,7 @@ The extension injects a sidebar on Canvas that expects the **frontend dev server
 ## Tech stack (high level)
 
 - **The Boss UI:** Next.js 15, React 19, TypeScript, Tailwind CSS 4  
+- **Optional sync:** Supabase Auth + Postgres (`boss_app_state` JSON document)  
 - **Backend:** Python, FastAPI (DocAI / legacy integration)  
 - **Elsewhere in repo:** MongoDB, S3, LLM providers — used by backend paths, not by the Boss MVP UI
 

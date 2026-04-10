@@ -36,7 +36,6 @@ export function BossSidebar() {
     isBossDayCommitted,
     supabaseConfigured,
     authUser,
-    signOut,
   } = useAppState()
   const [createOpen, setCreateOpen] = useState(false)
 
@@ -90,7 +89,7 @@ export function BossSidebar() {
           <span className="mt-2 text-3xl leading-none" aria-hidden>
             ◉
           </span>
-          <span className="mt-2 text-[10px] text-[var(--color-text-muted)]">Profile</span>
+          <span className="mt-2 text-[10px] text-[var(--color-text-muted)]">Dashboard</span>
         </Link>
 
         <div className="mt-8 flex items-center justify-between px-1">
@@ -155,29 +154,14 @@ export function BossSidebar() {
           + New role
         </button>
 
-        {supabaseConfigured && (
-          <div className="mt-4 space-y-2 border-t border-white/[0.06] pt-4 text-[10px] text-[var(--color-text-muted)]">
-            {authUser?.email ? (
-              <>
-                <p className="truncate px-1 text-[var(--color-text-faint)]" title={authUser.email}>
-                  {authUser.email}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => void signOut()}
-                  className="w-full rounded-lg py-2 text-[var(--color-text-muted)] transition hover:bg-white/[0.04] hover:text-[var(--color-text-primary)]"
-                >
-                  Sign out
-                </button>
-              </>
-            ) : (
-              <Link
-                href="/login"
-                className="block w-full rounded-lg py-2 text-center text-sky-400/90 transition hover:bg-white/[0.04] hover:text-sky-300"
-              >
-                Sign in to sync
-              </Link>
-            )}
+        {supabaseConfigured && !authUser?.email && (
+          <div className="mt-4 border-t border-white/[0.06] pt-4 text-[10px] text-[var(--color-text-muted)]">
+            <Link
+              href="/login"
+              className="block w-full rounded-lg py-2 text-center text-sky-400/90 transition hover:bg-white/[0.04] hover:text-sky-300"
+            >
+              Sign in to sync
+            </Link>
           </div>
         )}
 

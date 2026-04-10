@@ -214,9 +214,29 @@ export function LoginForm() {
         </p>
       )}
 
+      <div className="mt-8 border-t border-white/[0.06] pt-6 text-center">
+        <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--color-text-faint)]">
+          Password
+        </p>
+        <div className="mt-3 flex flex-col gap-2 text-xs">
+          <Link
+            href="/forgot-password"
+            className="rounded-lg py-2 text-sky-400/90 transition hover:bg-white/[0.04] hover:text-sky-300"
+          >
+            Forgot password
+          </Link>
+          <Link
+            href="/account/password"
+            className="rounded-lg py-2 text-[var(--color-text-muted)] transition hover:bg-white/[0.04] hover:text-[var(--color-text-primary)]"
+          >
+            Change password
+          </Link>
+        </div>
+      </div>
+
       <Link
         href="/boss"
-        className="mt-8 block text-center text-xs text-[var(--color-text-faint)] hover:text-[var(--color-text-muted)]"
+        className="mt-6 block text-center text-xs text-[var(--color-text-faint)] hover:text-[var(--color-text-muted)]"
       >
         ← Back to Boss
       </Link>

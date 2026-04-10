@@ -7,7 +7,6 @@ import { formatCoins } from '@/lib/earnings'
 import { getTodayKey } from '@/lib/dailyBoss'
 import { useAppState } from '@/context/AppStateContext'
 import type { Session } from '@/lib/types'
-import { CurrencyBadge } from './CurrencyBadge'
 import { SessionSummaryModal } from './SessionSummaryModal'
 import { SessionTimer } from './SessionTimer'
 import { TaskList } from './TaskList'
@@ -28,7 +27,6 @@ export function RoleWorkspace({ roleId }: Props) {
     getActiveSessionForRole,
     liveElapsedSecondsForRole,
     liveSessionEarningsForRole,
-    liveTotalCurrency,
     tasksCompletedDuringSession,
     deleteRole,
     updateRole,
@@ -133,10 +131,6 @@ export function RoleWorkspace({ roleId }: Props) {
 
   return (
     <div className="mx-auto max-w-2xl pb-20">
-      <div className="mb-6 flex flex-wrap items-center justify-end gap-3">
-        <CurrencyBadge amount={liveTotalCurrency()} />
-      </div>
-
       <header
         className="panel-card p-6"
         style={{ borderColor: `${accent}44` }}
@@ -175,7 +169,7 @@ export function RoleWorkspace({ roleId }: Props) {
                   />
                 </h1>
                 <p className="text-sm text-[var(--color-text-muted)]">
-                  {role.hourlyRate} coins/hour while clocked in
+                  {role.hourlyRate} dollars/hour while clocked in
                 </p>
               </div>
             </div>
@@ -191,7 +185,7 @@ export function RoleWorkspace({ roleId }: Props) {
             <div>
               <p className="text-xs uppercase tracking-wide text-emerald-200/80">This session</p>
               <p className="font-mono text-lg text-amber-200">
-                🪙 {formatCoins(liveSessionEarningsForRole(roleId))}
+                💲 {formatCoins(liveSessionEarningsForRole(roleId))} dollars
               </p>
             </div>
           </div>

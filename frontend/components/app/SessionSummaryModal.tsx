@@ -51,7 +51,7 @@ export function SessionSummaryModal({
           </div>
           <div className="flex justify-between gap-4">
             <dt className="text-[var(--color-text-muted)]">Earned this session</dt>
-            <dd className="font-semibold text-amber-200">🪙 {formatCoins(earnings)}</dd>
+            <dd className="font-semibold text-emerald-200">💲 {formatCoins(earnings)} dollars</dd>
           </div>
         </dl>
 

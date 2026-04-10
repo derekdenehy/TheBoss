@@ -59,7 +59,7 @@ export function CreateRoleModal({ open, onClose, onCreate }: Props) {
           New role
         </h2>
         <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-          Name your &quot;hat&quot; and set how many coins you earn per hour while clocked in.
+          Name your &quot;hat&quot; and set how many dollars you earn per hour while clocked in.
         </p>
 
         <label className="mt-5 block text-xs font-medium uppercase tracking-wide text-[var(--color-text-muted)]">
@@ -74,7 +74,7 @@ export function CreateRoleModal({ open, onClose, onCreate }: Props) {
         />
 
         <label className="mt-4 block text-xs font-medium uppercase tracking-wide text-[var(--color-text-muted)]">
-          Coins per hour
+          Dollars per hour
         </label>
         <input
           type="number"

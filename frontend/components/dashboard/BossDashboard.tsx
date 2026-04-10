@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { BossModeRoutine } from '../app/BossModeRoutine'
-import { CurrencyBadge } from '../app/CurrencyBadge'
 import { useAppState } from '@/context/AppStateContext'
 import { formatCoins, formatDuration } from '@/lib/earnings'
 import { DEFAULT_HOURLY_RATE } from '@/lib/types'
@@ -22,13 +21,7 @@ const TABS: { id: BossTab; label: string }[] = [
 
 export function BossDashboard() {
   const [tab, setTab] = useState<BossTab>('overview')
-  const {
-    hydrated,
-    roles,
-    liveTotalCurrency,
-    liveBossWindowSeconds,
-    liveBossWindowStintEarnings,
-  } = useAppState()
+  const { hydrated, roles, liveBossWindowSeconds, liveBossWindowStintEarnings } = useAppState()
 
   if (!hydrated) {
     return (
@@ -40,8 +33,8 @@ export function BossDashboard() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-16 pt-2 sm:px-6">
-      <header className="flex flex-col gap-3 border-b border-white/[0.06] pb-6 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-        <div className="min-w-0 flex-1">
+      <header className="border-b border-white/[0.06] pb-6">
+        <div className="min-w-0">
           <h1 className="text-xl font-semibold tracking-tight text-[var(--color-text-primary)] sm:text-2xl">
             Boss
           </h1>
@@ -51,14 +44,13 @@ export function BossDashboard() {
               {formatDuration(liveBossWindowSeconds())}
             </span>
             <span className="mx-1.5 text-white/15">·</span>
-            <span className="text-amber-200/70">
-              +{formatCoins(liveBossWindowStintEarnings())} this visit
+            <span className="text-emerald-200/70">
+              +{formatCoins(liveBossWindowStintEarnings())} dollars this visit
             </span>
             <span className="mx-1.5 text-white/15">·</span>
-            <span>{DEFAULT_HOURLY_RATE} coins/hr</span>
+            <span>{DEFAULT_HOURLY_RATE} dollars/hr</span>
           </p>
         </div>
-        <CurrencyBadge amount={liveTotalCurrency()} />
       </header>
 
       {roles.length === 0 ? (

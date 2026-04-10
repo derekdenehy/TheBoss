@@ -6,7 +6,9 @@
 |-------|------------|
 | **`/`** | Progress landing — optional “north star” number and label, link into the app |
 | **`/boss`** | Main dashboard — roles, tasks, sessions, calendar-style views, KPIs |
-| **`/login`** | Sign in with Supabase (only used when env vars are set) |
+| **`/login`** | Sign in / create account (Supabase; only when env vars are set) |
+| **`/forgot-password`** | Request a password reset email |
+| **`/account/password`** | Set a new password (after reset email link, or from **Change password** on `/login` while signed in) |
 
 ### Optional: Supabase (cloud sync)
 
@@ -27,7 +29,7 @@ Supabase only allows the browser to be sent back to URLs you list here. That mat
 
 1. **Authentication** → **URL Configuration**.
 2. **Site URL** → `http://localhost:3000` (or your deployed URL later).
-3. **Redirect URLs** → add `http://localhost:3000/auth/callback` (and your production callback when you deploy).
+3. **Redirect URLs** → add `http://localhost:3000/auth/callback` (and your production callback when you deploy). Password reset emails use this URL too (`?next=/account/password`), so you do not need a separate entry for `/account/password` unless Supabase asks for it explicitly.
 4. Save if prompted.
 
 #### 3. Turn on email + password

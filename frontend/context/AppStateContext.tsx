@@ -18,8 +18,13 @@ import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { isSupabaseConfigured } from '@/lib/supabase/env'
 import { fetchBossAppStateJson, upsertBossAppState } from '@/lib/supabase/sync'
 import { loadAppState, parseAppStateFromUnknown, saveAppState } from '@/lib/storage'
+import {
+  removeLinesFromAllWorkingState,
+  syncWorkingStateAfterTaskPatch,
+} from '@/lib/aiContext'
 import { collectDescendantTaskIds, nextTaskSortOrder } from '@/lib/taskTree'
 import type {
+  AIContext,
   AppState,
   BossDashboardModule,
   CalendarEvent,
@@ -40,13 +45,24 @@ type AppActions = {
   addRole: (input: { name: string; color?: string; hourlyRate?: number }) => boolean
   updateRole: (
     id: string,
-    patch: Partial<Pick<Role, 'name' | 'color' | 'icon' | 'hourlyRate'>>
+    patch: Partial<
+      Pick<
+        Role,
+        | 'name'
+        | 'color'
+        | 'icon'
+        | 'hourlyRate'
+        | 'workspaceNotes'
+        | 'workspaceResourceLinks'
+        | 'workspaceBlocks'
+      >
+    >
   ) => boolean
   deleteRole: (id: string) => void
   addTask: (
     roleId: string,
     title: string,
-    options?: { briefingMeta?: TaskBriefingMeta; parentTaskId?: string }
+    options?: { briefingMeta?: TaskBriefingMeta; parentTaskId?: string; status?: Task['status'] }
   ) => void
   updateTask: (
     id: string,
@@ -110,6 +126,9 @@ type AppActions = {
   liveBossWindowStintEarnings: () => number
   /** `totalCurrency` plus pending coins from the current Boss visit. */
   liveTotalCurrency: () => number
+  /** Replace the full AI context blob (profile, goals, projects, working state). */
+  setAIContext: (ctx: AIContext) => void
+  setAIContextSetupComplete: (complete: boolean) => void
   supabaseConfigured: boolean
   authUser: { email?: string } | null
   signOut: () => Promise<void>
@@ -423,7 +442,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const updateRole = useCallback(
     (
       id: string,
-      patch: Partial<Pick<Role, 'name' | 'color' | 'icon' | 'hourlyRate'>>
+      patch: Partial<
+        Pick<
+          Role,
+          | 'name'
+          | 'color'
+          | 'icon'
+          | 'hourlyRate'
+          | 'workspaceNotes'
+          | 'workspaceResourceLinks'
+          | 'workspaceBlocks'
+        >
+      >
     ) => {
       const name = patch.name?.trim()
       if (name !== undefined) {
@@ -464,28 +494,35 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     (
       roleId: string,
       title: string,
-      options?: { briefingMeta?: TaskBriefingMeta; parentTaskId?: string }
+      options?: { briefingMeta?: TaskBriefingMeta; parentTaskId?: string; status?: Task['status'] }
     ) => {
       const t = title.trim()
       if (!t) return
       setState((s) => {
         const parentId = options?.parentTaskId
+        let parent: Task | undefined
         if (parentId) {
-          const parent = s.tasks.find((x) => x.id === parentId)
+          parent = s.tasks.find((x) => x.id === parentId)
           if (!parent || parent.roleId !== roleId) return s
         }
         const now = new Date().toISOString()
         const sortOrder = nextTaskSortOrder(s.tasks, roleId, parentId)
+        const inheritInProgress = parent?.status === 'in_progress'
+        const status = options?.status ?? (inheritInProgress ? 'in_progress' : 'todo')
+        const inProgressStartedAt = status === 'in_progress' ? now : undefined
+        const completedAt = status === 'done' ? now : undefined
         const task: Task = {
           id: createId(),
           roleId,
           title: t,
-          status: 'todo',
+          status,
           createdAt: now,
           updatedAt: now,
           sortOrder,
           ...(parentId ? { parentTaskId: parentId } : {}),
           ...(options?.briefingMeta ? { briefingMeta: options.briefingMeta } : {}),
+          ...(inProgressStartedAt ? { inProgressStartedAt } : {}),
+          ...(completedAt ? { completedAt } : {}),
         }
         return { ...s, tasks: [...s.tasks, task] }
       })
@@ -497,59 +534,68 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     (id: string, patch: Partial<Pick<Task, 'title' | 'status' | 'dueAt'>>) => {
       const nowIso = new Date().toISOString()
       const nowMs = Date.now()
-      setState((s) => ({
-        ...s,
-        tasks: s.tasks.map((t) => {
-          if (t.id !== id) return t
-          const nextStatus = patch.status ?? t.status
+      setState((s) => {
+        const t = s.tasks.find((x) => x.id === id)
+        if (!t) return s
 
-          let totalSecondsSpent = t.totalSecondsSpent ?? 0
-          let inProgressStartedAt = t.inProgressStartedAt
+        const nextStatus = patch.status ?? t.status
 
-          if (patch.status !== undefined) {
-            if (t.status === 'in_progress' && nextStatus !== 'in_progress') {
-              if (t.inProgressStartedAt) {
-                const start = new Date(t.inProgressStartedAt).getTime()
-                if (!Number.isNaN(start)) {
-                  totalSecondsSpent += Math.max(0, Math.floor((nowMs - start) / 1000))
-                }
+        let totalSecondsSpent = t.totalSecondsSpent ?? 0
+        let inProgressStartedAt = t.inProgressStartedAt
+
+        if (patch.status !== undefined) {
+          if (t.status === 'in_progress' && nextStatus !== 'in_progress') {
+            if (t.inProgressStartedAt) {
+              const start = new Date(t.inProgressStartedAt).getTime()
+              if (!Number.isNaN(start)) {
+                totalSecondsSpent += Math.max(0, Math.floor((nowMs - start) / 1000))
               }
-              inProgressStartedAt = undefined
             }
-            if (nextStatus === 'in_progress' && t.status !== 'in_progress') {
-              inProgressStartedAt = nowIso
-            }
+            inProgressStartedAt = undefined
           }
-
-          let completedAt = t.completedAt
-          if (patch.status !== undefined) {
-            if (nextStatus === 'done') completedAt = nowIso
-            else completedAt = undefined
+          if (nextStatus === 'in_progress' && t.status !== 'in_progress') {
+            inProgressStartedAt = nowIso
           }
+        }
 
-          let dueAt = t.dueAt
-          if (patch.dueAt !== undefined) {
-            const d = patch.dueAt.trim()
-            dueAt = d === '' ? undefined : d
-          }
+        let completedAt = t.completedAt
+        if (patch.status !== undefined) {
+          if (nextStatus === 'done') completedAt = nowIso
+          else completedAt = undefined
+        }
 
-          let title = t.title
-          // Do not trim on every keystroke — trailing spaces are normal while typing;
-          // trimming here made spaces impossible in controlled task title inputs.
-          if (patch.title !== undefined) title = patch.title
+        let dueAt = t.dueAt
+        if (patch.dueAt !== undefined) {
+          const d = patch.dueAt.trim()
+          dueAt = d === '' ? undefined : d
+        }
 
-          return {
-            ...t,
-            title,
-            status: nextStatus,
-            updatedAt: nowIso,
-            completedAt,
-            dueAt,
-            totalSecondsSpent,
-            inProgressStartedAt,
-          }
-        }),
-      }))
+        let title = t.title
+        if (patch.title !== undefined) title = patch.title
+
+        const updated: Task = {
+          ...t,
+          title,
+          status: nextStatus,
+          updatedAt: nowIso,
+          completedAt,
+          dueAt,
+          totalSecondsSpent,
+          inProgressStartedAt,
+        }
+
+        const nextWorkingState = syncWorkingStateAfterTaskPatch(
+          s.aiContext.workingState,
+          { title: t.title, status: t.status },
+          { title: updated.title, status: updated.status }
+        )
+
+        return {
+          ...s,
+          tasks: s.tasks.map((x) => (x.id === id ? updated : x)),
+          aiContext: { ...s.aiContext, workingState: nextWorkingState },
+        }
+      })
     },
     []
   )
@@ -557,7 +603,19 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const deleteTask = useCallback((id: string) => {
     setState((s) => {
       const removeIds = new Set(collectDescendantTaskIds(s.tasks, id))
-      return { ...s, tasks: s.tasks.filter((t) => !removeIds.has(t.id)) }
+      const removedTitles = s.tasks
+        .filter((t) => removeIds.has(t.id))
+        .map((t) => t.title.trim())
+        .filter(Boolean)
+      const workingState =
+        removedTitles.length > 0
+          ? removeLinesFromAllWorkingState(s.aiContext.workingState, removedTitles)
+          : s.aiContext.workingState
+      return {
+        ...s,
+        tasks: s.tasks.filter((t) => !removeIds.has(t.id)),
+        aiContext: { ...s.aiContext, workingState },
+      }
     })
   }, [])
 
@@ -931,6 +989,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     [state.tasks]
   )
 
+  const setAIContext = useCallback((ctx: AIContext) => {
+    setState((s) => ({ ...s, aiContext: ctx }))
+  }, [])
+
+  const setAIContextSetupComplete = useCallback((complete: boolean) => {
+    setState((s) => ({ ...s, aiContextSetupComplete: complete }))
+  }, [])
+
   const signOut = useCallback(async () => {
     const supabase = getSupabaseBrowserClient()
     if (supabase) await supabase.auth.signOut()
@@ -985,6 +1051,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       liveBossWindowSeconds,
       liveBossWindowStintEarnings,
       liveTotalCurrency,
+      setAIContext,
+      setAIContextSetupComplete,
       supabaseConfigured: isSupabaseConfigured(),
       authUser,
       signOut,
@@ -999,6 +1067,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       addTask,
       updateTask,
       deleteTask,
+      setAIContext,
+      setAIContextSetupComplete,
       clockIn,
       clockOut,
       getRoleById,
@@ -1033,6 +1103,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       liveBossWindowSeconds,
       liveBossWindowStintEarnings,
       liveTotalCurrency,
+      setAIContext,
+      setAIContextSetupComplete,
       signOut,
     ]
   )

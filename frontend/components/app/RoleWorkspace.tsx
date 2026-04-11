@@ -6,7 +6,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { formatCoins } from '@/lib/earnings'
 import { getTodayKey } from '@/lib/dailyBoss'
 import { useAppState } from '@/context/AppStateContext'
-import type { Session } from '@/lib/types'
+import {
+  effectiveWorkspaceBlocks,
+  finalizeWorkspaceBlocksForSave,
+} from '@/lib/roleWorkspaceBlocks'
+import { orderTasksForStatusColumn } from '@/lib/taskTree'
+import type { RoleWorkspaceBlock, Session } from '@/lib/types'
+import { InProgressModularWorkspace } from './InProgressModularWorkspace'
 import { SessionSummaryModal } from './SessionSummaryModal'
 import { SessionTimer } from './SessionTimer'
 import { TaskList } from './TaskList'
@@ -71,6 +77,28 @@ export function RoleWorkspace({ roleId }: Props) {
       (a, b) => (a.briefingMeta!.order) - (b.briefingMeta!.order)
     )[0]?.id ?? null
   }, [tasks, todayKey])
+
+  const inProgressRootTasks = useMemo(
+    () => tasks.filter((t) => t.status === 'in_progress' && !t.parentTaskId),
+    [tasks]
+  )
+
+  const inProgressPrimaryTitle = useMemo(() => {
+    const rows = orderTasksForStatusColumn(tasks, 'in_progress')
+    if (rows.length === 0) return null
+    const startTask =
+      startHereTaskId &&
+      tasks.find((t) => t.id === startHereTaskId && t.status === 'in_progress')
+    if (startTask) return startTask.title
+    const roots = rows.filter((r) => r.depth === 0)
+    if (roots.length === 1) return roots[0].task.title
+    if (roots.length > 1) {
+      const t0 = roots[0].task.title
+      return roots.length === 2 ? `${t0} · +1 other` : `${t0} · +${roots.length - 1} others`
+    }
+    return rows[0].task.title
+  }, [tasks, startHereTaskId])
+
   const sessionHere = getActiveSessionForRole(roleId)
   const clockedHere = !!sessionHere
 
@@ -129,79 +157,107 @@ export function RoleWorkspace({ roleId }: Props) {
 
   const accent = role.color || '#38bdf8'
 
+  const workspaceBlocks = useMemo(() => effectiveWorkspaceBlocks(role), [role])
+
+  const handleWorkspaceBlocks = (next: RoleWorkspaceBlock[]) => {
+    updateRole(roleId, {
+      workspaceBlocks: finalizeWorkspaceBlocksForSave(next),
+      workspaceNotes: '',
+      workspaceResourceLinks: [],
+    })
+  }
+
+  const stepHint =
+    inProgressRootTasks.length === 1
+      ? 'Nests under your current top-level focus.'
+      : inProgressRootTasks.length > 1
+        ? 'Top-level in progress (several focuses).'
+        : 'Creates an in-progress task; use + Subtask on a row for splits.'
+
+  const inProgressWorkspace = (
+    <InProgressModularWorkspace
+      blocks={workspaceBlocks}
+      onUpdateBlocks={handleWorkspaceBlocks}
+      onAddInProgressStep={(title) => {
+        const parentId =
+          inProgressRootTasks.length === 1 ? inProgressRootTasks[0].id : undefined
+        addTask(roleId, title, { status: 'in_progress', parentTaskId: parentId })
+      }}
+      stepHint={stepHint}
+    />
+  )
+
   return (
-    <div className="mx-auto max-w-2xl pb-20">
+    <div className="mx-auto max-w-3xl pb-20">
       <header
-        className="panel-card p-6"
+        className="panel-card px-3 py-2.5 sm:px-4"
         style={{ borderColor: `${accent}44` }}
       >
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-text-muted)]">
-              Role mode
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <div
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-base sm:h-10 sm:w-10 sm:text-lg"
+            style={{ backgroundColor: `${accent}22`, color: accent }}
+          >
+            {role.icon || '◆'}
+          </div>
+          <div className="min-w-0 flex-1">
+            <input
+              className="w-full max-w-md bg-transparent text-base font-semibold text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-faint)] focus:ring-2 focus:ring-sky-500/30 rounded-md -mx-0.5 px-0.5 sm:text-lg"
+              value={nameEdit}
+              onChange={(e) => setNameEdit(e.target.value)}
+              onBlur={commitRoleName}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  ;(e.target as HTMLInputElement).blur()
+                }
+                if (e.key === 'Escape') {
+                  setNameEdit(role.name)
+                  ;(e.target as HTMLInputElement).blur()
+                }
+              }}
+              aria-label="Role name"
+              spellCheck={false}
+            />
+            <p className="text-[11px] text-[var(--color-text-muted)]">
+              {role.hourlyRate} / hr · role mode
             </p>
-            <div className="mt-2 flex items-center gap-3">
-              <div
-                className="flex h-12 w-12 items-center justify-center rounded-2xl text-xl"
-                style={{ backgroundColor: `${accent}22`, color: accent }}
-              >
-                {role.icon || '◆'}
-              </div>
-              <div className="min-w-0 flex-1">
-                <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
-                  <input
-                    className="w-full max-w-xl bg-transparent text-2xl font-bold text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-faint)] focus:ring-2 focus:ring-sky-500/35 rounded-md -mx-1 px-1"
-                    value={nameEdit}
-                    onChange={(e) => setNameEdit(e.target.value)}
-                    onBlur={commitRoleName}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        ;(e.target as HTMLInputElement).blur()
-                      }
-                      if (e.key === 'Escape') {
-                        setNameEdit(role.name)
-                        ;(e.target as HTMLInputElement).blur()
-                      }
-                    }}
-                    aria-label="Role name"
-                    spellCheck={false}
+          </div>
+          <div className="flex w-full shrink-0 items-center justify-end gap-2 sm:ml-auto sm:w-auto">
+            {clockedHere && (
+              <div className="mr-auto flex flex-wrap items-baseline gap-x-3 gap-y-0.5 sm:mr-0 sm:gap-x-4">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-[10px] uppercase tracking-wide text-emerald-200/70">
+                    Time
+                  </span>
+                  <SessionTimer
+                    seconds={liveElapsedSecondsForRole(roleId)}
+                    className="font-mono text-sm tabular-nums text-emerald-200 sm:text-base"
                   />
-                </h1>
-                <p className="text-sm text-[var(--color-text-muted)]">
-                  {role.hourlyRate} dollars/hour while clocked in
-                </p>
+                </div>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-[10px] uppercase tracking-wide text-amber-200/70">
+                    Session
+                  </span>
+                  <span className="font-mono text-sm tabular-nums text-amber-200">
+                    {formatCoins(liveSessionEarningsForRole(roleId))}
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
+            <button
+              type="button"
+              onClick={handleClockToggle}
+              className={`rounded-xl px-3.5 py-2 text-sm font-semibold transition sm:px-4 ${
+                clockedHere
+                  ? 'bg-rose-500/90 text-white hover:bg-rose-400'
+                  : 'bg-emerald-500/90 text-slate-950 hover:bg-emerald-400'
+              }`}
+            >
+              {clockedHere ? 'Clock out' : 'Clock in'}
+            </button>
           </div>
         </div>
-
-        {clockedHere && (
-          <div className="mt-6 grid gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-4 sm:grid-cols-2">
-            <div>
-              <p className="text-xs uppercase tracking-wide text-emerald-200/80">Session time</p>
-              <SessionTimer seconds={liveElapsedSecondsForRole(roleId)} />
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-wide text-emerald-200/80">This session</p>
-              <p className="font-mono text-lg text-amber-200">
-                💲 {formatCoins(liveSessionEarningsForRole(roleId))} dollars
-              </p>
-            </div>
-          </div>
-        )}
-
-        <button
-          type="button"
-          onClick={handleClockToggle}
-          className={`mt-6 w-full rounded-2xl py-4 text-base font-bold transition ${
-            clockedHere
-              ? 'bg-rose-500/90 text-white hover:bg-rose-400'
-              : 'bg-emerald-500/90 text-slate-950 hover:bg-emerald-400'
-          }`}
-        >
-          {clockedHere ? 'Clock out' : 'Clock in'}
-        </button>
       </header>
 
       {bossBriefing && todayBossRoutine && (
@@ -277,20 +333,22 @@ export function RoleWorkspace({ roleId }: Props) {
         </form>
 
         <div className="mt-8">
-          {tasks.length === 0 ? (
-            <div className="panel-card p-6 text-center text-sm text-[var(--color-text-muted)]">
-              Add one to three small tasks—then clock in and work through them.
-            </div>
-          ) : (
-            <TaskList
-              tasks={tasks}
-              startHereTaskId={bossBriefing ? startHereTaskId : null}
-              onChangeStatus={(id, status) => updateTask(id, { status })}
-              onEditTitle={(id, title) => updateTask(id, { title })}
-              onDelete={(id) => deleteTask(id)}
-              onAddSubtask={(parentId, title) => addTask(roleId, title, { parentTaskId: parentId })}
-            />
+          {tasks.length === 0 && (
+            <p className="mb-4 text-sm text-[var(--color-text-muted)]">
+              Queue work in <strong className="text-[var(--color-text-primary)]">To do</strong>, or add
+              steps in <strong className="text-[var(--color-text-primary)]">In progress</strong> above.
+            </p>
           )}
+          <TaskList
+            tasks={tasks}
+            startHereTaskId={bossBriefing ? startHereTaskId : null}
+            inProgressPrimaryTitle={inProgressPrimaryTitle}
+            inProgressWorkspace={inProgressWorkspace}
+            onChangeStatus={(id, status) => updateTask(id, { status })}
+            onEditTitle={(id, title) => updateTask(id, { title })}
+            onDelete={(id) => deleteTask(id)}
+            onAddSubtask={(parentId, title) => addTask(roleId, title, { parentTaskId: parentId })}
+          />
         </div>
       </section>
 

@@ -1,18 +1,21 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useTaskDoneCelebration } from '@/hooks/useTaskDoneCelebration'
 import { orderTasksForStatusColumn } from '@/lib/taskTree'
 import type { Task, TaskStatus } from '@/lib/types'
 import { TaskDuration } from './TaskDuration'
 
-const STATUS_ORDER: TaskStatus[] = ['todo', 'in_progress', 'done']
+/** In progress first (main workspace); completed and queue follow. */
+const DISPLAY_ORDER: TaskStatus[] = ['in_progress', 'done', 'todo']
 
 const LABELS: Record<TaskStatus, string> = {
   todo: 'To do',
   in_progress: 'In progress',
-  done: 'Done',
+  done: 'Completed',
 }
+
+const COLLAPSE_DONE_THRESHOLD = 5
 
 type Props = {
   tasks: Task[]
@@ -22,6 +25,10 @@ type Props = {
   onAddSubtask: (parentId: string, title: string) => void
   /** Today’s first packet task — surfaced as “start here”. */
   startHereTaskId?: string | null
+  /** Primary focus title shown beside the In progress heading. */
+  inProgressPrimaryTitle?: string | null
+  /** Modular workspace (notes / links / files) above the in-progress task list. */
+  inProgressWorkspace?: ReactNode
 }
 
 export function TaskList({
@@ -31,31 +38,81 @@ export function TaskList({
   onDelete,
   onAddSubtask,
   startHereTaskId,
+  inProgressPrimaryTitle,
+  inProgressWorkspace,
 }: Props) {
   const { celebrateId, submitStatus } = useTaskDoneCelebration()
   const [subtaskParentId, setSubtaskParentId] = useState<string | null>(null)
   const [subtaskDraft, setSubtaskDraft] = useState('')
+  /** When set, overrides auto collapse for the completed section. */
+  const [doneOpenOverride, setDoneOpenOverride] = useState<boolean | undefined>(undefined)
 
-  const grouped = STATUS_ORDER.map((status) => ({
-    status,
-    rows: orderTasksForStatusColumn(tasks, status),
-  }))
+  const grouped = useMemo(
+    () =>
+      DISPLAY_ORDER.map((status) => ({
+        status,
+        rows: orderTasksForStatusColumn(tasks, status),
+      })),
+    [tasks]
+  )
+
+  const counts = useMemo(() => {
+    const c: Record<TaskStatus, number> = { todo: 0, in_progress: 0, done: 0 }
+    for (const t of tasks) c[t.status]++
+    return c
+  }, [tasks])
+
+  const doneRows = grouped.find((g) => g.status === 'done')?.rows ?? []
+  const autoDoneOpen = doneRows.length <= COLLAPSE_DONE_THRESHOLD
+  const doneSectionOpen = doneOpenOverride !== undefined ? doneOpenOverride : autoDoneOpen
 
   return (
-    <div className="space-y-8">
-      {grouped.map(({ status, rows }) => (
-        <section key={status}>
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
-            {LABELS[status]}
-          </h3>
-          {rows.length === 0 ? (
-            <p className="text-sm text-[var(--color-text-faint)]">Nothing here.</p>
+    <div className="space-y-6">
+      <div
+        className="flex flex-wrap gap-2 rounded-xl border border-white/[0.08] bg-[var(--color-bg-panel)]/50 px-3 py-2.5"
+        aria-label="Task counts"
+      >
+        <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500/14 px-2.5 py-1 text-xs font-medium text-amber-100/90">
+          <span className="opacity-80">In progress</span>
+          <span className="tabular-nums">{counts.in_progress}</span>
+        </span>
+        <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.06] px-2.5 py-1 text-xs font-medium text-[var(--color-text-muted)]">
+          <span className="opacity-80">To do</span>
+          <span className="tabular-nums">{counts.todo}</span>
+        </span>
+        <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/15 px-2.5 py-1 text-xs font-medium text-emerald-200/95">
+          <span className="opacity-80">Done</span>
+          <span className="tabular-nums text-emerald-100">{counts.done}</span>
+        </span>
+      </div>
+
+      {grouped.map(({ status, rows }) => {
+        const isDone = status === 'done'
+        const isFocus = status === 'in_progress'
+        const showDoneToggle = isDone && rows.length > COLLAPSE_DONE_THRESHOLD
+        const visibleRows = isDone && showDoneToggle && !doneSectionOpen ? [] : rows
+
+        const sectionBody =
+          rows.length === 0 ? (
+            <p className="text-sm text-[var(--color-text-faint)]">
+              {isFocus
+                ? 'Nothing in progress yet—add a step below or move something here from To do.'
+                : 'Nothing here.'}
+            </p>
+          ) : visibleRows.length === 0 ? (
+            <p className="text-sm text-[var(--color-text-faint)]">
+              {rows.length} completed — expand above to review or reopen.
+            </p>
           ) : (
-            <ul className="space-y-2">
-              {rows.map(({ task, depth, subRowHint }) => (
+            <ul className={isDone ? 'space-y-1.5' : isFocus ? 'space-y-2.5' : 'space-y-2'}>
+              {visibleRows.map(({ task, depth, subRowHint }) => (
                 <li
                   key={task.id}
-                  className={`panel-card flex flex-col gap-2 p-3 sm:flex-row sm:items-start sm:justify-between ${
+                  className={`panel-card flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between ${
+                    isDone ? 'border-emerald-500/15 bg-emerald-500/[0.04] py-2 sm:py-2' : ''
+                  } ${isDone ? 'px-3' : ''} ${
+                    isFocus ? 'border-amber-500/20 bg-[var(--color-bg-deep)]/80 p-3.5' : 'p-3'
+                  } ${
                     startHereTaskId === task.id
                       ? 'ring-2 ring-sky-500/50 ring-offset-2 ring-offset-[var(--color-bg-deep)]'
                       : ''
@@ -76,7 +133,11 @@ export function TaskList({
                       <p className="mb-1 text-[10px] text-[var(--color-text-faint)]">{subRowHint}</p>
                     )}
                     <input
-                      className="w-full bg-transparent text-sm text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-faint)]"
+                      className={`w-full bg-transparent text-sm outline-none placeholder:text-[var(--color-text-faint)] ${
+                        isDone
+                          ? 'text-[var(--color-text-muted)] line-through decoration-emerald-500/40'
+                          : 'text-[var(--color-text-primary)]'
+                      } ${isFocus ? 'text-[15px] leading-snug sm:text-base' : ''}`}
                       value={task.title}
                       onChange={(e) => onEditTitle(task.id, e.target.value)}
                       onBlur={() => {
@@ -125,7 +186,10 @@ export function TaskList({
                     )}
                   </div>
                   <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
-                    <TaskDuration task={task} className="min-w-[3rem] text-right" />
+                    <TaskDuration
+                      task={task}
+                      className={`min-w-[3rem] text-right ${isDone ? 'text-[var(--color-text-faint)]' : ''}`}
+                    />
                     <select
                       className="rounded-lg border border-white/10 bg-[var(--color-bg-deep)] px-2 py-1.5 text-xs text-[var(--color-text-primary)] outline-none"
                       value={task.status}
@@ -162,9 +226,74 @@ export function TaskList({
                 </li>
               ))}
             </ul>
-          )}
-        </section>
-      ))}
+          )
+
+        if (isFocus) {
+          return (
+            <section key={status} className="space-y-3">
+              <div className="rounded-2xl border border-amber-500/30 bg-gradient-to-b from-amber-500/[0.09] to-[var(--color-bg-panel)]/30 p-4 sm:p-5">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                  <h3 className="shrink-0 text-xs font-semibold uppercase tracking-wider text-amber-100/90">
+                    {LABELS[status]}
+                    <span className="ml-2 font-normal normal-case tracking-normal text-[var(--color-text-faint)]">
+                      · {rows.length} active
+                    </span>
+                  </h3>
+                  {inProgressPrimaryTitle && (
+                    <p
+                      className="min-w-0 text-sm font-medium leading-snug text-[var(--color-text-primary)] sm:max-w-[65%] sm:text-right"
+                      title={inProgressPrimaryTitle}
+                    >
+                      {inProgressPrimaryTitle}
+                    </p>
+                  )}
+                </div>
+                {inProgressWorkspace && <div className="mt-4 space-y-4">{inProgressWorkspace}</div>}
+                <div className={inProgressWorkspace ? 'mt-5 border-t border-amber-500/15 pt-5' : 'mt-4'}>
+                  {sectionBody}
+                </div>
+              </div>
+            </section>
+          )
+        }
+
+        return (
+          <section key={status}>
+            {isDone && showDoneToggle ? (
+              <button
+                type="button"
+                onClick={() => setDoneOpenOverride(!doneSectionOpen)}
+                className="mb-3 flex w-full items-center justify-between gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.07] px-3 py-2.5 text-left transition hover:bg-emerald-500/12"
+              >
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-emerald-200/90">
+                  {LABELS[status]}
+                  <span className="ml-2 font-normal normal-case tracking-normal text-emerald-100/70">
+                    · {rows.length} {rows.length === 1 ? 'task' : 'tasks'}
+                  </span>
+                </h3>
+                <span className="shrink-0 text-[11px] font-medium text-emerald-200/80">
+                  {doneSectionOpen ? 'Hide' : 'Show all'}
+                </span>
+              </button>
+            ) : (
+              <h3
+                className={`mb-3 text-xs font-semibold uppercase tracking-wider ${
+                  isDone ? 'text-emerald-200/85' : 'text-[var(--color-text-muted)]'
+                }`}
+              >
+                {LABELS[status]}
+                {rows.length > 0 && (
+                  <span className="ml-2 font-normal normal-case tracking-normal text-[var(--color-text-faint)]">
+                    · {rows.length}
+                  </span>
+                )}
+              </h3>
+            )}
+
+            {sectionBody}
+          </section>
+        )
+      })}
     </div>
   )
 }

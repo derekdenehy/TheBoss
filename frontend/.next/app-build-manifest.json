@@ -26,10 +26,20 @@
       "static/chunks/main-app.js",
       "static/chunks/app/boss/page.js"
     ],
+    "/api/boss/chat/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/boss/chat/route.js"
+    ],
     "/boss/role/[id]/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/boss/role/[id]/page.js"
+    ],
+    "/boss/context/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/boss/context/page.js"
     ]
   }
 }

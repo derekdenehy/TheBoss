@@ -1,4 +1,5 @@
 import type {
+  AIContext,
   AppState,
   BossDashboardModule,
   BossModuleTemplateKey,
@@ -7,10 +8,14 @@ import type {
   KpiDefinition,
   KpiEntry,
   NorthStarMetric,
+  ProjectContext,
   Session,
   Task,
+  UserGoals,
+  UserProfile,
+  WorkingState,
 } from './types'
-import { emptyAppState } from './types'
+import { emptyAIContext, emptyAppState } from './types'
 
 const TEMPLATE_KEYS = new Set<BossModuleTemplateKey>([
   'custom',
@@ -196,6 +201,98 @@ function normalizeBossDashboardModule(raw: unknown): BossDashboardModule | null 
   }
 }
 
+const WORKING_LIST_CAP = 40
+
+function normalizeStringList(raw: unknown, cap: number): string[] {
+  if (!Array.isArray(raw)) return []
+  const out: string[] = []
+  for (const x of raw) {
+    if (typeof x !== 'string') continue
+    const t = x.trim()
+    if (!t) continue
+    if (!out.includes(t)) out.push(t)
+    if (out.length >= cap) break
+  }
+  return out
+}
+
+function normalizeUserProfile(raw: unknown): UserProfile {
+  if (!raw || typeof raw !== 'object') {
+    return emptyAIContext().profile
+  }
+  const p = raw as Record<string, unknown>
+  const roles = normalizeStringList(p.roles, WORKING_LIST_CAP)
+  return {
+    roles,
+    preferredTaskStyle:
+      typeof p.preferredTaskStyle === 'string' ? p.preferredTaskStyle.trim() : '',
+    preferredWarmup: typeof p.preferredWarmup === 'string' ? p.preferredWarmup.trim() : '',
+    commonBlockers: normalizeStringList(p.commonBlockers, WORKING_LIST_CAP),
+  }
+}
+
+function normalizeUserGoals(raw: unknown): UserGoals {
+  if (!raw || typeof raw !== 'object') {
+    return emptyAIContext().goals
+  }
+  const g = raw as Record<string, unknown>
+  const sec = g.secondaryPriority
+  const secondary =
+    typeof sec === 'string' && sec.trim() !== '' ? sec.trim() : undefined
+  return {
+    mainGoal: typeof g.mainGoal === 'string' ? g.mainGoal.trim() : '',
+    currentPriority: typeof g.currentPriority === 'string' ? g.currentPriority.trim() : '',
+    ...(secondary ? { secondaryPriority: secondary } : {}),
+  }
+}
+
+function normalizeProjectContext(raw: unknown): ProjectContext | null {
+  if (!raw || typeof raw !== 'object') return null
+  const o = raw as Record<string, unknown>
+  const name = typeof o.name === 'string' ? o.name.trim() : ''
+  if (!name) return null
+  const bottleneck = o.bottleneck
+  return {
+    name,
+    summary: typeof o.summary === 'string' ? o.summary.trim() : '',
+    phase: typeof o.phase === 'string' ? o.phase.trim() : '',
+    workstreams: normalizeStringList(o.workstreams, 24),
+    ...(typeof bottleneck === 'string' && bottleneck.trim() !== ''
+      ? { bottleneck: bottleneck.trim() }
+      : {}),
+  }
+}
+
+function normalizeWorkingState(raw: unknown): WorkingState {
+  if (!raw || typeof raw !== 'object') {
+    return emptyAIContext().workingState
+  }
+  const w = raw as Record<string, unknown>
+  return {
+    inProgress: normalizeStringList(w.inProgress, WORKING_LIST_CAP),
+    urgent: normalizeStringList(w.urgent, WORKING_LIST_CAP),
+    blocked: normalizeStringList(w.blocked, WORKING_LIST_CAP),
+    avoiding: normalizeStringList(w.avoiding, WORKING_LIST_CAP),
+  }
+}
+
+function normalizeAIContext(raw: unknown): AIContext {
+  if (!raw || typeof raw !== 'object') {
+    return emptyAIContext()
+  }
+  const c = raw as Record<string, unknown>
+  const projectsRaw = c.projects
+  const projects = Array.isArray(projectsRaw)
+    ? projectsRaw.map(normalizeProjectContext).filter((p): p is ProjectContext => p !== null)
+    : []
+  return {
+    profile: normalizeUserProfile(c.profile),
+    goals: normalizeUserGoals(c.goals),
+    projects,
+    workingState: normalizeWorkingState(c.workingState),
+  }
+}
+
 /** Backfill route billing for active sessions saved before `billableMsAccrued` existed. */
 function migrateSessionsBilling(raw: unknown[], nowMs: number): Session[] {
   if (!Array.isArray(raw)) return []
@@ -246,6 +343,10 @@ function normalizeState(parsed: unknown): AppState {
         .sort((a, b) => a.sortOrder - b.sortOrder)
     : []
 
+  const base = p as AppState
+  const aiContextSetupComplete =
+    typeof base.aiContextSetupComplete === 'boolean' ? base.aiContextSetupComplete : true
+
   return {
     roles: Array.isArray(p.roles) ? p.roles : [],
     tasks,
@@ -267,6 +368,8 @@ function normalizeState(parsed: unknown): AppState {
     kpiDefinitions,
     kpiEntries,
     bossDashboardModules,
+    aiContext: normalizeAIContext(base.aiContext),
+    aiContextSetupComplete,
   }
 }
 

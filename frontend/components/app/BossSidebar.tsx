@@ -154,6 +154,13 @@ export function BossSidebar() {
           + New role
         </button>
 
+        <Link
+          href="/boss/context"
+          className="mt-2 block w-full rounded-xl border border-white/[0.08] py-2.5 text-center text-xs font-medium text-[var(--color-text-muted)] transition hover:border-sky-500/35 hover:text-sky-200/90"
+        >
+          AI Studio
+        </Link>
+
         {supabaseConfigured && !authUser?.email && (
           <div className="mt-4 border-t border-white/[0.06] pt-4 text-[10px] text-[var(--color-text-muted)]">
             <Link

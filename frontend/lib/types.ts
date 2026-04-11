@@ -1,5 +1,17 @@
 export type TaskStatus = 'todo' | 'in_progress' | 'done'
 
+export type RoleWorkspaceResource = {
+  url: string
+  /** Short label; defaults to host when empty. */
+  label?: string
+}
+
+/** Modular pins in the role in-progress area (notes, links, small files). */
+export type RoleWorkspaceBlock =
+  | { id: string; type: 'text'; body: string }
+  | { id: string; type: 'link'; url: string; label?: string }
+  | { id: string; type: 'file'; name: string; mimeType?: string; dataUrl: string }
+
 export type Role = {
   id: string
   name: string
@@ -7,6 +19,11 @@ export type Role = {
   icon?: string
   hourlyRate: number
   createdAt: string
+  /** Modular workspace items (preferred). */
+  workspaceBlocks?: RoleWorkspaceBlock[]
+  /** Legacy; merged into blocks in UI until migrated on save. */
+  workspaceNotes?: string
+  workspaceResourceLinks?: RoleWorkspaceResource[]
 }
 
 /** Set when task was created from today's Boss packet (for ordering / “start here”). */
@@ -126,6 +143,43 @@ export type BossDashboardModule = {
   sortOrder: number
 }
 
+/** Stable preferences for AI task framing (Boss tab / future assistants). */
+export type UserProfile = {
+  roles: string[]
+  preferredTaskStyle: string
+  preferredWarmup: string
+  commonBlockers: string[]
+}
+
+export type UserGoals = {
+  mainGoal: string
+  currentPriority: string
+  secondaryPriority?: string
+}
+
+export type ProjectContext = {
+  name: string
+  summary: string
+  phase: string
+  workstreams: string[]
+  bottleneck?: string
+}
+
+export type WorkingState = {
+  inProgress: string[]
+  urgent: string[]
+  blocked: string[]
+  avoiding: string[]
+}
+
+/** Single JSON blob per user: profile, goals, projects, live working state. */
+export type AIContext = {
+  profile: UserProfile
+  goals: UserGoals
+  projects: ProjectContext[]
+  workingState: WorkingState
+}
+
 export type AppState = {
   roles: Role[]
   tasks: Task[]
@@ -140,9 +194,29 @@ export type AppState = {
   kpiDefinitions: KpiDefinition[]
   kpiEntries: KpiEntry[]
   bossDashboardModules: BossDashboardModule[]
+  aiContext: AIContext
+  /**
+   * When false, prompt the quick AI context onboarding. Omitted in stored JSON = treated as true
+   * so existing installs are not blocked.
+   */
+  aiContextSetupComplete: boolean
 }
 
 export const DEFAULT_HOURLY_RATE = 20
+
+export function emptyAIContext(): AIContext {
+  return {
+    profile: {
+      roles: [],
+      preferredTaskStyle: '',
+      preferredWarmup: '',
+      commonBlockers: [],
+    },
+    goals: { mainGoal: '', currentPriority: '' },
+    projects: [],
+    workingState: { inProgress: [], urgent: [], blocked: [], avoiding: [] },
+  }
+}
 
 export function emptyAppState(): AppState {
   return {
@@ -158,5 +232,7 @@ export function emptyAppState(): AppState {
     kpiDefinitions: [],
     kpiEntries: [],
     bossDashboardModules: [],
+    aiContext: emptyAIContext(),
+    aiContextSetupComplete: false,
   }
 }

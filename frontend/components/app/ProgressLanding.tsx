@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { useAppState } from '@/context/AppStateContext'
 
 export function ProgressLanding() {
-  const { hydrated, northStar, updateNorthStar } = useAppState()
+  const { hydrated, northStar, updateNorthStar, aiContextSetupComplete } = useAppState()
   const [editing, setEditing] = useState(false)
   const [draftLabel, setDraftLabel] = useState('')
   const [draftValue, setDraftValue] = useState('')
@@ -54,11 +54,17 @@ export function ProgressLanding() {
 
         <div className="mt-12 flex flex-col items-center gap-4">
           <Link
-            href="/boss"
+            href={aiContextSetupComplete ? '/boss' : '/boss/context'}
             className="inline-flex items-center justify-center rounded-2xl bg-sky-500/90 px-8 py-3.5 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
           >
-            Enter Boss
+            {aiContextSetupComplete ? 'Enter Boss' : 'Set up Boss (context first)'}
           </Link>
+          {!aiContextSetupComplete && (
+            <p className="max-w-sm text-center text-xs text-[var(--color-text-faint)]">
+              First time: a short form builds your profile, goals, and project so Focus and Chat can
+              help you decide what to do.
+            </p>
+          )}
           {!editing && (
             <button
               type="button"

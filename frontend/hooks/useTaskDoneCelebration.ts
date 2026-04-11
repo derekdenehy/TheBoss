@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { TaskStatus } from '@/lib/types'
 
-/** Time task stays in old column while the check “explodes”. */
-const EXPLODE_MS = 480
-/** Landing pop in the Done section after status updates. */
-const LAND_CELEBRATE_MS = 780
+/** Time task stays in old column: check fill + burst + row sinks toward Done. */
+const EXPLODE_MS = 700
+/** Landing motion in the Completed section after the task moves. */
+const LAND_CELEBRATE_MS = 860
 
 function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined') return false

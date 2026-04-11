@@ -42,7 +42,7 @@ type Props = {
 }
 
 export function BossChatTab({ onOpenBrief }: Props) {
-  const { aiContext, calendarEvents } = useAppState()
+  const { aiContext, calendarEvents, supabaseConfigured, authUser } = useAppState()
   const todayYmd = getTodayKey()
   const eventsToday = useMemo(
     () => eventsTouchingLocalDay(calendarEvents, todayYmd),
@@ -134,6 +134,35 @@ export function BossChatTab({ onOpenBrief }: Props) {
   const ws = aiContext.workingState
   const wsCounts =
     ws.inProgress.length + ws.urgent.length + ws.blocked.length + ws.avoiding.length
+
+  // Gate Focus behind login when Supabase is configured but user isn't signed in.
+  // Onboarding is intentionally excluded from this gate — users should finish setup first.
+  if (supabaseConfigured && !authUser) {
+    return (
+      <div className="flex min-h-[40vh] flex-col items-center justify-center gap-6 text-center">
+        <div className="space-y-2">
+          <p className="text-base font-semibold text-[var(--color-text-primary)]">
+            Sign in to use Focus
+          </p>
+          <p className="max-w-sm text-sm text-[var(--color-text-muted)]">
+            Your setup is saved on this device. Sign in to start conversations with Boss and keep everything synced.
+          </p>
+        </div>
+        <Link
+          href="/login"
+          className="rounded-xl bg-sky-500/90 px-6 py-2.5 text-sm font-semibold text-slate-950 hover:bg-sky-400"
+        >
+          Sign in
+        </Link>
+        <p className="text-xs text-[var(--color-text-faint)]">
+          No account yet?{' '}
+          <Link href="/login" className="text-sky-400/80 hover:text-sky-300 hover:underline">
+            Create one free
+          </Link>
+        </p>
+      </div>
+    )
+  }
 
   if (config === null) {
     return (

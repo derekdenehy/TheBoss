@@ -336,7 +336,7 @@ export function RoleWorkspace({ roleId }: Props) {
           {tasks.length === 0 && (
             <p className="mb-4 text-sm text-[var(--color-text-muted)]">
               Queue work in <strong className="text-[var(--color-text-primary)]">To do</strong>, or add
-              steps in <strong className="text-[var(--color-text-primary)]">In progress</strong> above.
+              steps in <strong className="text-[var(--color-text-primary)]">In progress</strong> below.
             </p>
           )}
           <TaskList

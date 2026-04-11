@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useAppState } from '@/context/AppStateContext'
+import { ConversationalOnboarding } from '@/components/app/ConversationalOnboarding'
 import { eventsTouchingLocalDay } from '@/lib/calendarDay'
 import { getTodayKey } from '@/lib/dailyBoss'
 import { formatCoins, formatDuration } from '@/lib/earnings'
@@ -21,13 +22,17 @@ const TABS: { id: BossTab; label: string }[] = [
 
 export function BossDashboard() {
   const [tab, setTab] = useState<BossTab>('chat')
+  const [saveBannerDismissed, setSaveBannerDismissed] = useState(false)
   const {
     hydrated,
     roles,
     liveBossWindowSeconds,
     liveBossWindowStintEarnings,
     aiContext,
+    aiContextSetupComplete,
     calendarEvents,
+    supabaseConfigured,
+    authUser,
   } = useAppState()
 
   const todayYmd = getTodayKey()
@@ -40,6 +45,41 @@ export function BossDashboard() {
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-[var(--color-text-muted)]">
         Loading…
+      </div>
+    )
+  }
+
+  // New user — show onboarding chat inside the full boss layout
+  if (!aiContextSetupComplete) {
+    return (
+      <div className="mx-auto max-w-6xl px-4 pb-16 pt-2 sm:px-6">
+        <header className="border-b border-white/[0.06] pb-6">
+          <h1 className="text-xl font-semibold tracking-tight text-[var(--color-text-primary)] sm:text-2xl">
+            Boss
+          </h1>
+          <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+            Let&apos;s get you set up before anything else.
+          </p>
+        </header>
+
+        {/* Tab bar visible but locked — shows what's coming */}
+        <nav
+          className="mt-8 flex gap-1 overflow-x-auto pb-1 opacity-30 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          aria-hidden
+        >
+          {TABS.map((t) => (
+            <div
+              key={t.id}
+              className="shrink-0 cursor-not-allowed rounded-xl px-4 py-2.5 text-sm font-medium text-[var(--color-text-muted)]"
+            >
+              {t.label}
+            </div>
+          ))}
+        </nav>
+
+        <div className="mt-8">
+          <ConversationalOnboarding />
+        </div>
       </div>
     )
   }
@@ -77,6 +117,26 @@ export function BossDashboard() {
           )}
         </div>
       </header>
+
+      {supabaseConfigured && !authUser && !saveBannerDismissed && (
+        <div className="mt-4 flex items-center justify-between gap-4 rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-sm">
+          <p className="text-sky-100/90">
+            Your setup is saved on this device.{' '}
+            <a href="/login" className="font-medium text-sky-300 underline-offset-2 hover:underline">
+              Sign in
+            </a>{' '}
+            to keep it synced and use Focus.
+          </p>
+          <button
+            type="button"
+            onClick={() => setSaveBannerDismissed(true)}
+            className="shrink-0 text-sky-300/60 hover:text-sky-200"
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {calendarToday.length > 0 && (
         <div className="mt-6 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/90">

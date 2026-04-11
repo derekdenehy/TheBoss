@@ -6,8 +6,8 @@ import { orderTasksForStatusColumn } from '@/lib/taskTree'
 import type { Task, TaskStatus } from '@/lib/types'
 import { TaskDuration } from './TaskDuration'
 
-/** In progress first (main workspace); completed and queue follow. */
-const DISPLAY_ORDER: TaskStatus[] = ['in_progress', 'done', 'todo']
+/** Natural flow: queue → focus → archive. */
+const DISPLAY_ORDER: TaskStatus[] = ['todo', 'in_progress', 'done']
 
 const LABELS: Record<TaskStatus, string> = {
   todo: 'To do',
@@ -86,13 +86,13 @@ export function TaskList({
         className="flex flex-wrap gap-2 rounded-xl border border-white/[0.08] bg-[var(--color-bg-panel)]/50 px-3 py-2.5"
         aria-label="Task counts"
       >
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500/14 px-2.5 py-1 text-xs font-medium text-amber-100/90">
-          <span className="opacity-80">In progress</span>
-          <span className="tabular-nums">{counts.in_progress}</span>
-        </span>
         <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.06] px-2.5 py-1 text-xs font-medium text-[var(--color-text-muted)]">
           <span className="opacity-80">To do</span>
           <span className="tabular-nums">{counts.todo}</span>
+        </span>
+        <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500/14 px-2.5 py-1 text-xs font-medium text-amber-100/90">
+          <span className="opacity-80">In progress</span>
+          <span className="tabular-nums">{counts.in_progress}</span>
         </span>
         <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/15 px-2.5 py-1 text-xs font-medium text-emerald-200/95">
           <span className="opacity-80">Done</span>
@@ -110,7 +110,7 @@ export function TaskList({
           rows.length === 0 ? (
             <p className="text-sm text-[var(--color-text-faint)]">
               {isFocus
-                ? 'Nothing in progress yet—add a step below or move something here from To do.'
+                ? 'Nothing in progress yet—add a step in the workspace above or pull something from To do.'
                 : 'Nothing here.'}
             </p>
           ) : visibleRows.length === 0 ? (
@@ -139,25 +139,30 @@ export function TaskList({
                     marginLeft: depth > 0 ? Math.min(depth, 8) * 14 : undefined,
                   }}
                 >
-                  <div className="flex gap-2.5 sm:gap-3">
+                  <div className="flex gap-2 sm:gap-2.5">
                     {task.status === 'done' ? (
                       <button
                         type="button"
-                        className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-400/45 bg-emerald-500/25 text-emerald-100 shadow-sm hover:bg-emerald-500/35"
+                        className="task-done-check task-done-check--filled mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-emerald-950/90"
                         title="Move back to To do"
                         aria-label="Mark not done — move back to To do"
                         onClick={() => submitStatus(task.id, 'todo', onChangeStatus)}
                       >
-                        <CheckIcon className="h-4 w-4" />
+                        <CheckIcon className="h-3 w-3" />
                       </button>
                     ) : (
                       <button
                         type="button"
-                        className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-white/20 bg-transparent text-transparent hover:border-emerald-400/55 hover:bg-emerald-500/10"
+                        className={`task-done-check task-done-check--empty relative mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full outline-none hover:border-emerald-400/45 hover:bg-emerald-500/[0.08] focus-visible:ring-2 focus-visible:ring-emerald-400/40 ${
+                          completingId === task.id ? 'task-done-check--completing' : ''
+                        }`}
                         title="Mark done"
                         aria-label="Mark done"
                         onClick={() => submitStatus(task.id, 'done', onChangeStatus)}
                       >
+                        <span className="task-done-check__fill" aria-hidden />
+                        <span className="task-done-check__burst" aria-hidden />
+                        <CheckIcon className="task-done-check__tick h-3 w-3" />
                         <span className="sr-only">Mark done</span>
                       </button>
                     )}

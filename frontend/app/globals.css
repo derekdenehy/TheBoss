@@ -304,7 +304,29 @@ body {
 
 .task-row-completing.panel-card {
   overflow: visible;
-  opacity: 0.94;
+  pointer-events: none;
+  animation: task-row-sink-to-done 0.68s cubic-bezier(0.45, 0.02, 0.18, 1) forwards;
+  z-index: 2;
+}
+
+@keyframes task-row-sink-to-done {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+    box-shadow: 0 0 0 0 transparent;
+  }
+  45% {
+    transform: translateY(10px) scale(0.995);
+    opacity: 0.97;
+    box-shadow:
+      0 16px 36px color-mix(in srgb, var(--color-success) 14%, transparent),
+      inset 0 0 0 1px color-mix(in srgb, var(--color-success) 22%, transparent);
+  }
+  100% {
+    transform: translateY(32px) scale(0.96);
+    opacity: 0.82;
+    box-shadow: 0 28px 48px color-mix(in srgb, var(--color-success) 10%, transparent);
+  }
 }
 
 tr.task-row-completing {
@@ -313,6 +335,164 @@ tr.task-row-completing {
 
 tr.task-row-completing td {
   overflow: visible;
+}
+
+/* Role task list: complete control — fill, tick, burst ring */
+.task-done-check {
+  box-sizing: border-box;
+}
+
+.task-done-check--empty {
+  border: 2px solid rgb(255 255 255 / 0.2);
+  background: transparent;
+}
+
+.task-done-check--filled {
+  border: 1px solid color-mix(in srgb, var(--color-success) 50%, transparent);
+  background: color-mix(in srgb, var(--color-success) 38%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-success) 12%, transparent);
+}
+
+.task-done-check--filled:hover {
+  background: color-mix(in srgb, var(--color-success) 48%, transparent);
+}
+
+.task-done-check__fill {
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-success) 92%, rgb(255 255 255) 8%);
+  transform: scale(0);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.task-done-check__burst {
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--color-success) 70%, transparent);
+  opacity: 0;
+  transform: scale(0.75);
+  pointer-events: none;
+}
+
+.task-done-check__tick {
+  position: relative;
+  z-index: 1;
+  opacity: 0;
+  transform: scale(0.5);
+  color: rgb(15 23 42 / 0.92);
+  pointer-events: none;
+}
+
+.task-done-check--empty:not(.task-done-check--completing) .task-done-check__tick {
+  opacity: 0;
+  transform: scale(0.5);
+}
+
+.task-done-check--completing {
+  border-color: color-mix(in srgb, var(--color-success) 45%, transparent);
+}
+
+.task-done-check--completing .task-done-check__fill {
+  animation: task-check-fill-pop 0.34s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.task-done-check--completing .task-done-check__tick {
+  animation: task-check-tick-pop 0.26s 0.2s cubic-bezier(0.34, 1.2, 0.64, 1) forwards;
+}
+
+.task-done-check--completing .task-done-check__burst {
+  animation: task-check-burst-out 0.5s 0.18s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes task-check-fill-pop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  55% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes task-check-tick-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.45) rotate(-12deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes task-check-burst-out {
+  0% {
+    opacity: 0.95;
+    transform: scale(0.75);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.85);
+  }
+}
+
+.panel-card.task-row-celebrate {
+  animation: task-done-land-panel 0.86s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes task-done-land-panel {
+  0% {
+    transform: translateY(18px) scale(0.99);
+    opacity: 0.65;
+    filter: brightness(1.12);
+  }
+  38% {
+    transform: translateY(-3px) scale(1.008);
+    opacity: 1;
+    filter: brightness(1.04);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+    filter: brightness(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-row-completing.panel-card {
+    animation: none;
+    transform: none;
+    opacity: 0.94;
+    box-shadow: none;
+  }
+
+  .task-done-check--completing .task-done-check__fill,
+  .task-done-check--completing .task-done-check__tick,
+  .task-done-check--completing .task-done-check__burst {
+    animation: none;
+  }
+
+  .task-done-check--completing .task-done-check__fill {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  .task-done-check--completing .task-done-check__tick {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .panel-card.task-row-celebrate {
+    animation: none;
+  }
 }
 
 /* <tr> cannot animate transform reliably — use glow only */

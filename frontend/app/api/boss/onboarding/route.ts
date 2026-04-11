@@ -1,14 +1,35 @@
 import { NextResponse } from 'next/server'
-import {
-  mergeAIContextPatch,
-  onboardingSatisfied,
-} from '@/lib/aiContextMerge'
+import { mergeAIContextPatch } from '@/lib/aiContextMerge'
 import { callBossJsonModel } from '@/lib/boss-ai/callJsonModel'
 import { resolveBossAiProvider } from '@/lib/boss-ai/config'
 import type { ChatTurn } from '@/lib/boss-ai/callModel'
 import type { AIContext } from '@/lib/types'
 
 export const runtime = 'nodejs'
+
+// In-memory rate limiter — best-effort, resets on server restart.
+// For multi-instance production deployments, replace with a Redis-based limiter.
+const ipRequests = new Map<string, { count: number; resetAt: number }>()
+const RATE_WINDOW_MS = 60 * 60 * 1000 // 1 hour
+const RATE_MAX = 25 // generous enough for legit retries, not enough for abuse
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now()
+  // Prune stale entries to keep memory bounded
+  if (ipRequests.size > 10_000) {
+    for (const [key, val] of ipRequests) {
+      if (now > val.resetAt) ipRequests.delete(key)
+    }
+  }
+  const entry = ipRequests.get(ip)
+  if (!entry || now > entry.resetAt) {
+    ipRequests.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS })
+    return false
+  }
+  if (entry.count >= RATE_MAX) return true
+  entry.count++
+  return false
+}
 
 type OnboardingBody = {
   bootstrap?: boolean
@@ -24,6 +45,8 @@ type ModelOut = {
   nextStep?: string
   finishOnboarding?: boolean
 }
+
+type Step = 'dump' | 'roles' | 'done'
 
 function isAIContext(x: unknown): x is AIContext {
   if (!x || typeof x !== 'object') return false
@@ -50,26 +73,64 @@ function isChatTurns(x: unknown): x is ChatTurn[] {
   )
 }
 
-const SYSTEM = `You are Boss, onboarding a new user through a short conversation. You reduce decision fatigue by asking ONE sharp question at a time.
+const SYSTEM = `You are Boss. You are onboarding a new user. Your one goal: make them feel like everything is under control within three short exchanges.
 
-OUTPUT: Return ONLY a JSON object (no markdown) with this shape:
+This user likely has ADHD or executive function challenges. They are already carrying too much. Do not add to their load. Every message you send should make them feel lighter, not questioned.
+
+FLOW — three phases:
+
+Phase "dump" (bootstrap only):
+Send only the dump invitation. No preamble. No "before we set anything up." Start directly with the ask.
+Example: "Dump everything you're managing right now. Don't organize it. Don't prioritize it. Just get it out."
+patch: null. nextStep: "roles". finishOnboarding: false.
+
+Phase "roles" (after the user's dump):
+This is the dopamine turn. The user just unloaded — now show them their world being organized.
+1. One short sentence naming the most urgent or emotionally loaded thing from their dump. Just name it, don't editorialize.
+2. Surface the roles you inferred from their dump as a short confirmation — not a question about roles, a statement with a light check: "I've set you up as [Role A], [Role B], and [Role C]. Anything off?"
+Keep this tight. Two sentences max before the question. No lists.
+Extract everything you can from the dump into the patch — roles, urgent items, projects, goals.
+nextStep: "done". finishOnboarding: false.
+
+Phase "done" (after role confirmation):
+Close fast. One short paragraph. Name the one thing to start with today. Make it feel like the path is clear.
+Do not ask any more questions. Just close.
+Apply any role corrections the user gave. Set finishOnboarding: true.
+
+STRICT RULES:
+- No bullet points. No numbered lists. Short paragraphs only.
+- One question per message, maximum. The only question across the whole flow is the role confirmation in phase "roles".
+- Never open any message with "Great!", "Sure!", "Absolutely!", "Of course!", "I can see that..."
+- No productivity jargon. No time-boxing, prioritizing, north star, MoSCoW, sprints.
+- Do not reflect the full dump back to the user. Pick one thing.
+- Warm but not performative. Direct. Short sentences.
+
+PATCH EXTRACTION — from the dump and role confirmation, silently populate:
+- profile.roles: infer what contexts the user switches between (2–4 short labels, e.g. "Student", "Startup Founder", "Side Project")
+- workingState.urgent: items with deadlines or emotional weight
+- workingState.inProgress: things actively being worked on
+- projects: any named project or major effort mentioned
+- goals.mainGoal: what seems to matter most overall
+Sparse context is fine. Do not invent details not present in the dump.
+
+OUTPUT: Return ONLY a valid JSON object, no markdown:
 {
-  "message": "What the user reads — warm, concise, one question when appropriate.",
-  "patch": null OR a partial object that updates their saved context. Allowed keys: "profile" (roles[], preferredTaskStyle, preferredWarmup, commonBlockers), "goals" (mainGoal, currentPriority, secondaryPriority), "projects" (array of {name, summary?, phase?, workstreams?, bottleneck?}), "workingState" (inProgress, urgent, blocked, avoiding as string arrays).
-  "nextStep": "roles" | "goals" | "project" | "done",
+  "message": "string",
+  "patch": null | { partial AIContext fields },
+  "nextStep": "dump" | "roles" | "done",
   "finishOnboarding": boolean
-}
-
-RULES:
-- Phase "roles" FIRST: Help them define 2–4 distinct "hats" or modes they switch between (e.g. student, founder, engineer, parent). Do NOT open with vague "what are you working on". Ask something specific like what contexts they mentally switch between in a typical week.
-- Phase "goals": Elicit the single main outcome that matters in roughly the next few weeks.
-- Phase "project": One concrete anchor — e.g. a problem set due today, a product, a client. Capture name (required); summary/phase optional.
-- Do NOT require or prioritize preferredTaskStyle, warmups, or commonBlockers during onboarding — omit them from patch unless the user volunteers (they are learned over time later).
-- When "patch" includes profile.roles, use short labels (2–6 words each), 2–4 roles.
-- Set finishOnboarding true only when the draft would have: at least 2 roles, a non-empty mainGoal, and at least one project with a name. Otherwise finishOnboarding false.
-- nextStep "done" when onboarding is effectively complete and you're wrapping up with a short encouraging closing message in "message".`
+}`
 
 export async function POST(req: Request) {
+  const forwarded = req.headers.get('x-forwarded-for')
+  const ip = forwarded ? forwarded.split(',')[0].trim() : 'unknown'
+  if (isRateLimited(ip)) {
+    return NextResponse.json(
+      { error: 'Too many requests. Try again in an hour.' },
+      { status: 429 }
+    )
+  }
+
   const provider = resolveBossAiProvider()
   if (!provider) {
     return NextResponse.json(
@@ -88,20 +149,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const stepRaw = typeof body.step === 'string' ? body.step : 'roles'
-  const step =
-    stepRaw === 'goals' || stepRaw === 'project' || stepRaw === 'done' || stepRaw === 'roles'
-      ? stepRaw
-      : 'roles'
+  const stepRaw = typeof body.step === 'string' ? body.step : 'dump'
+  const step: Step =
+    stepRaw === 'roles' || stepRaw === 'done' ? stepRaw : 'dump'
 
   if (!isAIContext(body.draft)) {
     return NextResponse.json({ error: 'Invalid draft aiContext' }, { status: 400 })
   }
   const draft = body.draft
-
-  const workspaceRoleNames = Array.isArray(body.workspaceRoleNames)
-    ? body.workspaceRoleNames.filter((x): x is string => typeof x === 'string')
-    : []
 
   const bootstrap = body.bootstrap === true
   if (!bootstrap && !isChatTurns(body.messages)) {
@@ -113,16 +168,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Empty messages' }, { status: 400 })
   }
 
+  const userCount = messages.filter((m) => m.role === 'user').length
+
   const convo =
     messages.length === 0
       ? '(No messages yet — this is the opening turn.)'
       : messages.map((m) => `${m.role.toUpperCase()}: ${m.content}`).join('\n\n')
 
   const userPayload = [
-    `Current step hint: ${step}`,
-    `Existing draft JSON: ${JSON.stringify(draft)}`,
-    `Workspace roles already created in the app (names): ${workspaceRoleNames.length ? workspaceRoleNames.join(', ') : 'none'}`,
-    bootstrap ? 'MODE: BOOTSTRAP — produce only the first question JSON. patch should be null. nextStep roles. finishOnboarding false.' : '',
+    `Current phase: ${step}`,
+    `Existing draft context: ${JSON.stringify(draft)}`,
+    bootstrap ? 'MODE: BOOTSTRAP — send only the brain dump invitation. patch: null. nextStep: "warmup". finishOnboarding: false.' : '',
     `Conversation:\n${convo}`,
   ]
     .filter(Boolean)
@@ -130,31 +186,23 @@ export async function POST(req: Request) {
 
   try {
     const parsed = await callBossJsonModel<ModelOut>(provider, SYSTEM, userPayload)
+
     const message =
       typeof parsed.message === 'string' && parsed.message.trim()
         ? parsed.message.trim()
-        : 'Tell me about the different hats you wear in a typical week — not job titles necessarily, but modes you switch into.'
+        : 'Dump everything you\'re managing right now. Don\'t organize it. Don\'t prioritize it. Just get it out.'
 
     const patch =
       parsed.patch && typeof parsed.patch === 'object' ? parsed.patch : null
     const merged = mergeAIContextPatch(draft, patch)
 
-    const satisfied = onboardingSatisfied(merged)
-    let nextStep = typeof parsed.nextStep === 'string' ? parsed.nextStep : step
-    if (!['roles', 'goals', 'project', 'done'].includes(nextStep)) {
-      nextStep = step
-    }
+    let nextStep: Step =
+      parsed.nextStep === 'roles' || parsed.nextStep === 'done' ? parsed.nextStep : step
 
-    if (!satisfied) {
-      if (merged.profile.roles.filter(Boolean).length < 2) nextStep = 'roles'
-      else if (!merged.goals.mainGoal.trim()) nextStep = 'goals'
-      else if (!merged.projects.some((p) => p.name.trim())) nextStep = 'project'
-    } else {
-      nextStep = 'done'
-    }
+    // Only allow finishing after the user has sent at least 2 messages (dump + warmup answer)
+    const finishOnboarding = userCount >= 2 && parsed.finishOnboarding === true
 
-    const finishOnboarding =
-      satisfied && (parsed.finishOnboarding === true || nextStep === 'done')
+    if (finishOnboarding) nextStep = 'done'
 
     return NextResponse.json({
       message,

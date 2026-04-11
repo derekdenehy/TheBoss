@@ -27,7 +27,7 @@ export function getBossAiPublicConfig(): BossAiPublicConfig {
 }
 
 export function anthropicModel(): string {
-  return process.env.BOSS_ANTHROPIC_MODEL?.trim() || 'claude-sonnet-4-5-20250929'
+  return process.env.BOSS_ANTHROPIC_MODEL?.trim() || 'claude-sonnet-4-6'
 }
 
 export function openaiModel(): string {

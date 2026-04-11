@@ -17,6 +17,20 @@ const LABELS: Record<TaskStatus, string> = {
 
 const COLLAPSE_DONE_THRESHOLD = 5
 
+function CheckIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="none" aria-hidden>
+      <path
+        d="M5 10.2 8.4 13.6 15.2 6.8"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 type Props = {
   tasks: Task[]
   onChangeStatus: (id: string, status: TaskStatus) => void
@@ -41,7 +55,7 @@ export function TaskList({
   inProgressPrimaryTitle,
   inProgressWorkspace,
 }: Props) {
-  const { celebrateId, submitStatus } = useTaskDoneCelebration()
+  const { completingId, celebrateId, submitStatus } = useTaskDoneCelebration()
   const [subtaskParentId, setSubtaskParentId] = useState<string | null>(null)
   const [subtaskDraft, setSubtaskDraft] = useState('')
   /** When set, overrides auto collapse for the completed section. */
@@ -118,11 +132,35 @@ export function TaskList({
                       : ''
                   } ${
                     celebrateId === task.id && task.status === 'done' ? 'task-row-celebrate' : ''
+                  } ${
+                    completingId === task.id && task.status !== 'done' ? 'task-row-completing' : ''
                   }`}
                   style={{
                     marginLeft: depth > 0 ? Math.min(depth, 8) * 14 : undefined,
                   }}
                 >
+                  <div className="flex gap-2.5 sm:gap-3">
+                    {task.status === 'done' ? (
+                      <button
+                        type="button"
+                        className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-400/45 bg-emerald-500/25 text-emerald-100 shadow-sm hover:bg-emerald-500/35"
+                        title="Move back to To do"
+                        aria-label="Mark not done — move back to To do"
+                        onClick={() => submitStatus(task.id, 'todo', onChangeStatus)}
+                      >
+                        <CheckIcon className="h-4 w-4" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-white/20 bg-transparent text-transparent hover:border-emerald-400/55 hover:bg-emerald-500/10"
+                        title="Mark done"
+                        aria-label="Mark done"
+                        onClick={() => submitStatus(task.id, 'done', onChangeStatus)}
+                      >
+                        <span className="sr-only">Mark done</span>
+                      </button>
+                    )}
                   <div className="min-w-0 flex-1">
                     {startHereTaskId === task.id && (
                       <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-sky-300">
@@ -185,6 +223,7 @@ export function TaskList({
                       </form>
                     )}
                   </div>
+                  </div>
                   <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
                     <TaskDuration
                       task={task}
@@ -196,11 +235,11 @@ export function TaskList({
                       onChange={(e) =>
                         submitStatus(task.id, e.target.value as TaskStatus, onChangeStatus)
                       }
-                      aria-label="Task status"
+                      aria-label={task.status === 'done' ? 'Task status' : 'Move between To do and In progress'}
                     >
                       <option value="todo">To do</option>
                       <option value="in_progress">In progress</option>
-                      <option value="done">Done</option>
+                      {task.status === 'done' ? <option value="done">Done</option> : null}
                     </select>
                     {subtaskParentId !== task.id && (
                       <button

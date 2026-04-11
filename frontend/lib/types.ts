@@ -10,7 +10,15 @@ export type RoleWorkspaceResource = {
 export type RoleWorkspaceBlock =
   | { id: string; type: 'text'; body: string }
   | { id: string; type: 'link'; url: string; label?: string }
-  | { id: string; type: 'file'; name: string; mimeType?: string; dataUrl: string }
+  | {
+      id: string
+      type: 'file'
+      name: string
+      mimeType?: string
+      dataUrl: string
+      /** When true, image files show filename + download only (no inline preview). */
+      hidePreview?: boolean
+    }
 
 export type Role = {
   id: string

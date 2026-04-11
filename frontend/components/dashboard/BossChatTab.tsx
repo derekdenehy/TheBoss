@@ -1,8 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppState } from '@/context/AppStateContext'
+import { eventsTouchingLocalDay } from '@/lib/calendarDay'
+import { getTodayKey } from '@/lib/dailyBoss'
 
 type Turn = { role: 'user' | 'assistant'; content: string }
 
@@ -29,6 +31,10 @@ const STARTER_PROMPTS: { label: string; text: string }[] = [
     label: 'Today’s shape',
     text: 'In 5 bullets, describe how today should feel and flow given my goals, blockers, and warm-up preference — no new tasks, just orientation.',
   },
+  {
+    label: 'Rank projects',
+    text: 'Propose an order for my projects using my goals, bottlenecks, and phase. Number them 1…n, explain briefly why, then ask me to confirm or say how I would reorder — treat your order as a draft.',
+  },
 ]
 
 type Props = {
@@ -36,7 +42,12 @@ type Props = {
 }
 
 export function BossChatTab({ onOpenBrief }: Props) {
-  const { aiContext } = useAppState()
+  const { aiContext, calendarEvents } = useAppState()
+  const todayYmd = getTodayKey()
+  const eventsToday = useMemo(
+    () => eventsTouchingLocalDay(calendarEvents, todayYmd),
+    [calendarEvents, todayYmd]
+  )
   const [config, setConfig] = useState<Config | null>(null)
   const [messages, setMessages] = useState<Turn[]>([])
   const [draft, setDraft] = useState('')
@@ -72,7 +83,12 @@ export function BossChatTab({ onOpenBrief }: Props) {
         const res = await fetch('/api/boss/chat', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ messages: nextMessages, aiContext }),
+          body: JSON.stringify({
+          messages: nextMessages,
+          aiContext,
+          calendarEvents,
+          todayLocalDate: todayYmd,
+        }),
         })
         const data = (await res.json()) as { reply?: string; error?: string }
         if (!res.ok) {
@@ -90,7 +106,7 @@ export function BossChatTab({ onOpenBrief }: Props) {
         setLoading(false)
       }
     },
-    [aiContext]
+    [aiContext, calendarEvents, todayYmd]
   )
 
   const sendWithText = useCallback(
@@ -148,9 +164,9 @@ export function BossChatTab({ onOpenBrief }: Props) {
         </ul>
         <p>
           <Link href="/boss/context" className="text-sky-400 hover:underline">
-            AI Studio
+            Context &amp; onboarding
           </Link>{' '}
-          still saves your brief; wire a key when you&apos;re ready to orchestrate with the model.
+          — add a key when you&apos;re ready to orchestrate with the model.
         </p>
       </div>
     )
@@ -193,7 +209,7 @@ export function BossChatTab({ onOpenBrief }: Props) {
             href="/boss/context"
             className="rounded-lg border border-white/10 py-2 text-center text-sky-300/90 hover:bg-white/[0.04]"
           >
-            Edit AI Studio
+            Context summary
           </Link>
           {onOpenBrief && (
             <button
@@ -211,6 +227,19 @@ export function BossChatTab({ onOpenBrief }: Props) {
       </aside>
 
       <div className="flex min-h-[min(72vh,760px)] flex-col gap-4">
+        {eventsToday.length > 0 && (
+          <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/90">
+            <p className="font-medium text-amber-50/95">On your calendar today</p>
+            <ul className="mt-2 list-inside list-disc text-amber-100/85">
+              {eventsToday.map((e) => (
+                <li key={e.id}>{e.title.trim() || 'Event'}</li>
+              ))}
+            </ul>
+            <p className="mt-2 text-xs text-amber-100/70">
+              Boss sees these too — ask if you&apos;ve thought about starting what&apos;s due.
+            </p>
+          </div>
+        )}
         <div>
           <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
             What do you want to move?

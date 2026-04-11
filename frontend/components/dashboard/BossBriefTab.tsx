@@ -7,7 +7,7 @@ type Props = {
   setTab: (t: BossTab) => void
 }
 
-/** Reference view of AI context (profile, goals, projects, working state) — same structure Chat uses. */
+/** Reference view of AI context (profile, goals, projects, working state) — same structure Focus uses. */
 export function BossBriefTab({ setTab }: Props) {
-  return <BossContextBrief setTab={setTab} />
+  return <BossContextBrief onOpenFocus={() => setTab('chat')} />
 }

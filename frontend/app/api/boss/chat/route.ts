@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
 import { callBossChatModel, type ChatTurn } from '@/lib/boss-ai/callModel'
 import { getBossAiPublicConfig, resolveBossAiProvider } from '@/lib/boss-ai/config'
+import { formatTodayCalendarBlock } from '@/lib/calendarDay'
 import { formatAIContextForPrompt } from '@/lib/aiContext'
-import type { AIContext } from '@/lib/types'
+import type { AIContext, CalendarEvent } from '@/lib/types'
 
 export const runtime = 'nodejs'
 
@@ -14,6 +15,19 @@ export async function GET() {
 type Body = {
   messages?: unknown
   aiContext?: unknown
+  calendarEvents?: unknown
+  todayLocalDate?: unknown
+}
+
+function sanitizeCalendarEvents(x: unknown): CalendarEvent[] {
+  if (!Array.isArray(x)) return []
+  return x.filter(
+    (e): e is CalendarEvent =>
+      e !== null &&
+      typeof e === 'object' &&
+      typeof (e as CalendarEvent).startsAt === 'string' &&
+      typeof (e as CalendarEvent).title === 'string'
+  )
 }
 
 function isChatTurns(x: unknown): x is ChatTurn[] {
@@ -76,17 +90,32 @@ export async function POST(req: Request) {
   const contextBlock =
     body.aiContext && isAIContext(body.aiContext)
       ? formatAIContextForPrompt(body.aiContext)
-      : 'No structured user context provided yet. Suggest filling AI Studio under /boss/context.'
+      : 'No structured user context yet. Point them to /boss/context for chat onboarding if appropriate.'
 
-  const system = `You are Boss, the orchestration layer for this user's workday. You only know what appears in the structured context below (and the chat). Do not invent goals, projects, or tasks that are not implied there.
+  const todayYmd =
+    typeof body.todayLocalDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.todayLocalDate)
+      ? body.todayLocalDate
+      : ''
+  const calendarBlock =
+    todayYmd !== ''
+      ? formatTodayCalendarBlock(sanitizeCalendarEvents(body.calendarEvents), todayYmd)
+      : '## Calendar\nNo local date supplied; skip calendar-specific nudges.'
+
+  const system = `You are Boss, the orchestration layer for this user's workday. You only know what appears in the structured context below, the calendar section, and this chat. Do not invent goals, projects, or tasks that are not implied there.
 
 How to think (in order — mirror this in answers when helpful):
 1) Working state — what is in progress, urgent, blocked, or being avoided right now.
 2) Goals — what matters most; align recommendations with main goal and current priority.
 3) Projects — use names, phase, workstreams, bottlenecks when choosing where to spend attention.
-4) Profile — phrase suggestions in their preferred task style; respect warm-up and common blockers (e.g. if they stall on vague tasks, force concrete verbs and small scopes).
+4) Profile — phrase suggestions in their preferred task style when known; preferredTaskStyle / warm-up / commonBlockers may be empty — that is normal. If empty, do not nag; you may infer gentle phrasing from how they write. Over time the user can share preferences in chat (no separate form required).
 
-Output style: default to ONE clear primary recommendation for what to do next, optionally up to two alternates. Use short bullets or tight paragraphs. Ask at most one clarifying question only if the context is empty or contradictory.
+Calendar behaviour:
+- If something is clearly due or happening **today** (see calendar section), open with a friendly check-in: e.g. whether they've thought about starting an assignment — supportive, not parental.
+- If **nothing** is on the calendar for today, you may propose a **tentative rank order** of their projects using goals + bottlenecks + phase. Present it as numbered list and ask them to **confirm or reorder** — make clear your order is a draft.
+
+Output style: default to ONE clear primary recommendation for what to do next when relevant, optionally up to two alternates. Use short bullets or tight paragraphs. Ask at most one clarifying question only if the context is empty or contradictory.
+
+${calendarBlock}
 
 Structured context:
 ${contextBlock}`

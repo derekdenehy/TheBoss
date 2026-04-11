@@ -1,7 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useAppState } from '@/context/AppStateContext'
+import { eventsTouchingLocalDay } from '@/lib/calendarDay'
+import { getTodayKey } from '@/lib/dailyBoss'
 import { formatCoins, formatDuration } from '@/lib/earnings'
 import { DEFAULT_HOURLY_RATE } from '@/lib/types'
 import type { BossTab } from './bossDashboardTabs'
@@ -25,7 +27,14 @@ export function BossDashboard() {
     liveBossWindowSeconds,
     liveBossWindowStintEarnings,
     aiContext,
+    calendarEvents,
   } = useAppState()
+
+  const todayYmd = getTodayKey()
+  const calendarToday = useMemo(
+    () => eventsTouchingLocalDay(calendarEvents, todayYmd),
+    [calendarEvents, todayYmd]
+  )
 
   if (!hydrated) {
     return (
@@ -69,11 +78,26 @@ export function BossDashboard() {
         </div>
       </header>
 
+      {calendarToday.length > 0 && (
+        <div className="mt-6 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/90">
+          <p className="font-medium text-amber-50/95">Something on your calendar today</p>
+          <ul className="mt-2 list-inside list-disc text-amber-100/85">
+            {calendarToday.map((e) => (
+              <li key={e.id}>{e.title.trim() || 'Event'}</li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-amber-100/75">
+            Open <strong className="font-medium text-amber-50/90">Focus</strong> — Boss can nudge you to
+            start (e.g. an assignment due tonight) without extra decisions from you.
+          </p>
+        </div>
+      )}
+
       {roles.length === 0 && (
         <div className="mt-6 rounded-xl border border-white/[0.06] bg-[var(--color-bg-panel)]/40 px-4 py-3 text-center text-sm text-[var(--color-text-muted)]">
           No roles yet. Use <strong className="text-[var(--color-text-primary)]">+ New role</strong> in
           the sidebar to track work by hat. You can still use <strong className="text-[var(--color-text-primary)]">Focus</strong>{' '}
-          with AI Studio context alone.
+          with your saved context.
         </div>
       )}
 

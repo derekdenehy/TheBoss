@@ -1,11 +1,24 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from 'react'
 import { safeHttpUrl } from '@/lib/roleWorkspaceBlocks'
 import { createId } from '@/lib/ids'
 import type { RoleWorkspaceBlock } from '@/lib/types'
 
 const MAX_FILE_BYTES = 1_500_000
+
+function isImageFileBlock(b: RoleWorkspaceBlock): boolean {
+  if (b.type !== 'file') return false
+  if (b.mimeType?.startsWith('image/')) return true
+  return b.dataUrl.startsWith('data:image/')
+}
 
 type Props = {
   blocks: RoleWorkspaceBlock[]
@@ -65,7 +78,7 @@ export function InProgressModularWorkspace({
 
   const onPickFile = () => fileRef.current?.click()
 
-  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
@@ -219,7 +232,13 @@ export function InProgressModularWorkspace({
             >
               <div className="mb-2 flex items-center justify-between gap-2">
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-faint)]">
-                  {b.type === 'text' ? 'Note' : b.type === 'link' ? 'Link' : 'File'}
+                  {b.type === 'text'
+                    ? 'Note'
+                    : b.type === 'link'
+                      ? 'Link'
+                      : isImageFileBlock(b)
+                        ? 'Image'
+                        : 'File'}
                 </span>
                 <button
                   type="button"
@@ -259,18 +278,52 @@ export function InProgressModularWorkspace({
                   <p className="mt-1 truncate text-[11px] text-[var(--color-text-faint)]">{b.url}</p>
                 </div>
               )}
-              {b.type === 'file' && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm text-[var(--color-text-primary)]">{b.name}</span>
-                  <a
-                    href={b.dataUrl}
-                    download={b.name}
-                    className="text-xs font-medium text-amber-200/90 hover:underline"
-                  >
-                    Download
-                  </a>
-                </div>
-              )}
+              {b.type === 'file' && (() => {
+                const image = isImageFileBlock(b)
+                const showPreview = image && !b.hidePreview
+                return (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <span className="min-w-0 flex-1 truncate text-sm text-[var(--color-text-primary)]">
+                        {b.name}
+                      </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <a
+                          href={b.dataUrl}
+                          download={b.name}
+                          className="text-xs font-medium text-amber-200/90 hover:underline"
+                        >
+                          Download
+                        </a>
+                        {image && (
+                          <button
+                            type="button"
+                            className="text-xs font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+                            onClick={() =>
+                              patchBlock(b.id, (x) =>
+                                x.type === 'file'
+                                  ? { ...x, hidePreview: !x.hidePreview }
+                                  : x
+                              )
+                            }
+                          >
+                            {b.hidePreview ? 'Show preview' : 'Hide preview'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    {showPreview && (
+                      <div className="overflow-hidden rounded-lg border border-white/10 bg-black/40">
+                        <img
+                          src={b.dataUrl}
+                          alt={b.name}
+                          className="max-h-[min(70vh,36rem)] w-full object-contain object-top"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
             </li>
           ))}
         </ul>

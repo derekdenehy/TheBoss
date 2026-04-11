@@ -158,7 +158,7 @@ export function BossSidebar() {
           href="/boss/context"
           className="mt-2 block w-full rounded-xl border border-white/[0.08] py-2.5 text-center text-xs font-medium text-[var(--color-text-muted)] transition hover:border-sky-500/35 hover:text-sky-200/90"
         >
-          AI Studio
+          Context
         </Link>
 
         {supabaseConfigured && !authUser?.email && (

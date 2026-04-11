@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { useMemo } from 'react'
 import { useAppState } from '@/context/AppStateContext'
 import type { AIContext } from '@/lib/types'
-import type { BossTab } from './bossDashboardTabs'
 
 function contextHasBody(ctx: AIContext): boolean {
   const ws = ctx.workingState
@@ -37,10 +36,10 @@ function contextHasBody(ctx: AIContext): boolean {
 const LIST_EMPTY = 'Nothing listed yet.'
 
 type Props = {
-  setTab: (t: BossTab) => void
+  onOpenFocus: () => void
 }
 
-export function BossContextBrief({ setTab }: Props) {
+export function BossContextBrief({ onOpenFocus }: Props) {
   const { aiContext, aiContextSetupComplete } = useAppState()
 
   const filled = useMemo(() => contextHasBody(aiContext), [aiContext])
@@ -64,10 +63,10 @@ export function BossContextBrief({ setTab }: Props) {
           </Link>
           <button
             type="button"
-            onClick={() => setTab('chat')}
+            onClick={onOpenFocus}
             className="rounded-xl border border-white/15 px-5 py-2.5 text-sm font-medium text-[var(--color-text-muted)] hover:bg-white/[0.04]"
           >
-            Chat anyway
+            Open Focus anyway
           </button>
         </div>
       </section>
@@ -83,14 +82,15 @@ export function BossContextBrief({ setTab }: Props) {
               Your Boss brief
             </h2>
             <p className="mt-1 max-w-xl text-xs text-[var(--color-text-muted)]">
-              Add goals, projects, and working state in AI Studio — they show up here and power Chat.
+              Finish setup at <Link href="/boss/context" className="text-sky-300 hover:underline">/boss/context</Link>{' '}
+              or tell Boss in Focus what to track.
             </p>
           </div>
           <Link
             href="/boss/context"
             className="shrink-0 text-xs font-medium text-sky-300 hover:underline"
           >
-            AI Studio →
+            Context setup →
           </Link>
         </div>
       </section>
@@ -117,14 +117,14 @@ export function BossContextBrief({ setTab }: Props) {
             href="/boss/context"
             className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-medium text-sky-300/90 hover:bg-white/[0.04]"
           >
-            Edit in AI Studio
+            View context page
           </Link>
           <button
             type="button"
-            onClick={() => setTab('chat')}
+            onClick={onOpenFocus}
             className="rounded-lg bg-white/[0.08] px-3 py-1.5 text-xs font-medium text-[var(--color-text-primary)] hover:bg-white/[0.12]"
           >
-            Ask Boss in Chat
+            Adjust in Focus
           </button>
         </div>
       </div>
@@ -141,8 +141,8 @@ export function BossContextBrief({ setTab }: Props) {
           <WorkingList label="Avoiding" items={ws.avoiding} tone="slate" />
         </div>
         <p className="mt-3 text-[10px] text-[var(--color-text-faint)]">
-          In progress syncs from task statuses; edit the rest in AI Studio or keep working — Chat sees
-          this snapshot when you send a message. Simple rule: tackle{' '}
+          In progress syncs from task statuses; mention urgent/blocked/avoiding in Focus or add them on
+          the context page — Boss sees this snapshot when you message. Simple rule: tackle{' '}
           <strong className="font-medium text-[var(--color-text-muted)]">urgent</strong> first, then keep{' '}
           <strong className="font-medium text-[var(--color-text-muted)]">in progress</strong> moving, and
           name what&apos;s <strong className="font-medium text-[var(--color-text-muted)]">blocked</strong>{' '}

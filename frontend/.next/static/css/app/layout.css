@@ -502,6 +502,9 @@
   .h-2 {
     height: calc(var(--spacing) * 2);
   }
+  .h-2\.5 {
+    height: calc(var(--spacing) * 2.5);
+  }
   .h-3 {
     height: calc(var(--spacing) * 3);
   }
@@ -556,6 +559,9 @@
   .w-2 {
     width: calc(var(--spacing) * 2);
   }
+  .w-2\.5 {
+    width: calc(var(--spacing) * 2.5);
+  }
   .w-3 {
     width: calc(var(--spacing) * 3);
   }
@@ -570,6 +576,9 @@
   }
   .w-10 {
     width: calc(var(--spacing) * 10);
+  }
+  .w-12 {
+    width: calc(var(--spacing) * 12);
   }
   .w-28 {
     width: calc(var(--spacing) * 28);
@@ -650,6 +659,9 @@
   .list-disc {
     list-style-type: disc;
   }
+  .\[appearance\:textfield\] {
+    appearance: textfield;
+  }
   .grid-cols-2 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -682,6 +694,9 @@
   }
   .justify-end {
     justify-content: flex-end;
+  }
+  .gap-0\.5 {
+    gap: calc(var(--spacing) * 0.5);
   }
   .gap-1 {
     gap: calc(var(--spacing) * 1);
@@ -1056,6 +1071,12 @@
     background-color: color-mix(in srgb, #0f1218 50%, transparent);
     @supports (color: color-mix(in lab, red, red)) {
       background-color: color-mix(in oklab, var(--color-bg-panel) 50%, transparent);
+    }
+  }
+  .bg-\[var\(--color-bg-panel\)\]\/60 {
+    background-color: color-mix(in srgb, #0f1218 60%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-bg-panel) 60%, transparent);
     }
   }
   .bg-\[var\(--color-bg-panel\)\]\/80 {
@@ -1700,6 +1721,9 @@
       color: color-mix(in oklab, var(--color-emerald-200) 95%, transparent);
     }
   }
+  .text-emerald-300 {
+    color: var(--color-emerald-300);
+  }
   .text-emerald-300\/90 {
     color: color-mix(in srgb, oklch(84.5% 0.143 164.978) 90%, transparent);
     @supports (color: color-mix(in lab, red, red)) {
@@ -1884,6 +1908,9 @@
   .opacity-80 {
     opacity: 80%;
   }
+  .opacity-95 {
+    opacity: 95%;
+  }
   .shadow-2xl {
     --tw-shadow: 0 25px 50px -12px var(--tw-shadow-color, rgb(0 0 0 / 0.25));
     box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
@@ -1964,6 +1991,11 @@
   .placeholder\:text-\[var\(--color-text-faint\)\] {
     &::placeholder {
       color: var(--color-text-faint);
+    }
+  }
+  .read-only\:cursor-default {
+    &:read-only {
+      cursor: default;
     }
   }
   .hover\:border-emerald-400\/45 {
@@ -2056,6 +2088,16 @@
         background-color: color-mix(in srgb, oklch(69.6% 0.17 162.48) 12%, transparent);
         @supports (color: color-mix(in lab, red, red)) {
           background-color: color-mix(in oklab, var(--color-emerald-500) 12%, transparent);
+        }
+      }
+    }
+  }
+  .hover\:bg-emerald-500\/20 {
+    &:hover {
+      @media (hover: hover) {
+        background-color: color-mix(in srgb, oklch(69.6% 0.17 162.48) 20%, transparent);
+        @supports (color: color-mix(in lab, red, red)) {
+          background-color: color-mix(in oklab, var(--color-emerald-500) 20%, transparent);
         }
       }
     }
@@ -2316,9 +2358,19 @@
       }
     }
   }
+  .disabled\:pointer-events-none {
+    &:disabled {
+      pointer-events: none;
+    }
+  }
   .disabled\:cursor-not-allowed {
     &:disabled {
       cursor: not-allowed;
+    }
+  }
+  .disabled\:opacity-30 {
+    &:disabled {
+      opacity: 30%;
     }
   }
   .disabled\:opacity-40 {
@@ -2508,6 +2560,16 @@
   .xl\:grid-cols-4 {
     @media (width >= 80rem) {
       grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+  .\[\&\:\:-webkit-inner-spin-button\]\:appearance-none {
+    &::-webkit-inner-spin-button {
+      appearance: none;
+    }
+  }
+  .\[\&\:\:-webkit-outer-spin-button\]\:appearance-none {
+    &::-webkit-outer-spin-button {
+      appearance: none;
     }
   }
   .\[\&\:\:-webkit-scrollbar\]\:hidden {

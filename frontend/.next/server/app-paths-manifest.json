@@ -1,6 +1,4 @@
 {
-  "/api/boss/chat/route": "app/api/boss/chat/route.js",
-  "/api/boss/onboarding/route": "app/api/boss/onboarding/route.js",
   "/page": "app/page.js",
   "/login/page": "app/login/page.js",
   "/boss/page": "app/boss/page.js",

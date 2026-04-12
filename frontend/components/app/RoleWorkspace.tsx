@@ -7,8 +7,9 @@ import { formatCoins } from '@/lib/earnings'
 import { getTodayKey } from '@/lib/dailyBoss'
 import { useAppState } from '@/context/AppStateContext'
 import {
-  effectiveWorkspaceBlocks,
+  effectiveTaskWorkspaceBlocks,
   finalizeWorkspaceBlocksForSave,
+  resolveWorkspaceAnchorTask,
 } from '@/lib/roleWorkspaceBlocks'
 import { orderTasksForStatusColumn } from '@/lib/taskTree'
 import type { RoleWorkspaceBlock, Session } from '@/lib/types'
@@ -99,6 +100,11 @@ export function RoleWorkspace({ roleId }: Props) {
     return rows[0].task.title
   }, [tasks, startHereTaskId])
 
+  const workspaceAnchorTask = useMemo(
+    () => resolveWorkspaceAnchorTask(tasks, startHereTaskId),
+    [tasks, startHereTaskId]
+  )
+
   const sessionHere = getActiveSessionForRole(roleId)
   const clockedHere = !!sessionHere
 
@@ -157,14 +163,27 @@ export function RoleWorkspace({ roleId }: Props) {
 
   const accent = role.color || '#38bdf8'
 
-  const workspaceBlocks = useMemo(() => effectiveWorkspaceBlocks(role), [role])
+  const workspaceBlocks = useMemo(
+    () => effectiveTaskWorkspaceBlocks(workspaceAnchorTask, role),
+    [workspaceAnchorTask, role]
+  )
 
   const handleWorkspaceBlocks = (next: RoleWorkspaceBlock[]) => {
-    updateRole(roleId, {
+    if (!workspaceAnchorTask) return
+    updateTask(workspaceAnchorTask.id, {
       workspaceBlocks: finalizeWorkspaceBlocksForSave(next),
-      workspaceNotes: '',
-      workspaceResourceLinks: [],
     })
+    const hasRoleLegacy =
+      (role.workspaceBlocks?.length ?? 0) > 0 ||
+      !!role.workspaceNotes?.trim() ||
+      (role.workspaceResourceLinks?.length ?? 0) > 0
+    if (hasRoleLegacy) {
+      updateRole(roleId, {
+        workspaceBlocks: [],
+        workspaceNotes: '',
+        workspaceResourceLinks: [],
+      })
+    }
   }
 
   const stepHint =
@@ -175,16 +194,39 @@ export function RoleWorkspace({ roleId }: Props) {
         : 'Creates an in-progress task; use + Subtask on a row for splits.'
 
   const inProgressWorkspace = (
-    <InProgressModularWorkspace
-      blocks={workspaceBlocks}
-      onUpdateBlocks={handleWorkspaceBlocks}
-      onAddInProgressStep={(title) => {
-        const parentId =
-          inProgressRootTasks.length === 1 ? inProgressRootTasks[0].id : undefined
-        addTask(roleId, title, { status: 'in_progress', parentTaskId: parentId })
-      }}
-      stepHint={stepHint}
-    />
+    <>
+      {workspaceAnchorTask ? (
+        <p className="mb-1 text-[11px] text-[var(--color-text-faint)]">
+          Workspace for{' '}
+          <span className="font-medium text-[var(--color-text-primary)]">
+            {workspaceAnchorTask.title}
+          </span>
+          {inProgressRootTasks.length > 1 && (
+            <span className="text-[var(--color-text-faint)]">
+              {' '}
+              (primary focus — several in progress)
+            </span>
+          )}
+        </p>
+      ) : (
+        <p className="mb-1 text-[11px] leading-snug text-[var(--color-text-faint)]">
+          Put a task in <strong className="text-[var(--color-text-primary)]">In progress</strong> to
+          attach notes, links, and files to that task. They stay with the task and hide here when
+          it&apos;s completed.
+        </p>
+      )}
+      <InProgressModularWorkspace
+        blocks={workspaceBlocks}
+        onUpdateBlocks={handleWorkspaceBlocks}
+        readOnly={!workspaceAnchorTask}
+        onAddInProgressStep={(title) => {
+          const parentId =
+            inProgressRootTasks.length === 1 ? inProgressRootTasks[0].id : undefined
+          addTask(roleId, title, { status: 'in_progress', parentTaskId: parentId })
+        }}
+        stepHint={stepHint}
+      />
+    </>
   )
 
   return (

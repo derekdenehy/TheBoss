@@ -27,9 +27,9 @@ export type Role = {
   icon?: string
   hourlyRate: number
   createdAt: string
-  /** Modular workspace items (preferred). */
+  /** @deprecated Migrated onto the focused in-progress task; cleared on next workspace save. */
   workspaceBlocks?: RoleWorkspaceBlock[]
-  /** Legacy; merged into blocks in UI until migrated on save. */
+  /** Legacy; merged into task workspace in UI until migrated on save. */
   workspaceNotes?: string
   workspaceResourceLinks?: RoleWorkspaceResource[]
 }
@@ -59,6 +59,8 @@ export type Task = {
   totalSecondsSpent?: number
   /** When the current in_progress stint started (ISO); cleared when pausing or completing */
   inProgressStartedAt?: string
+  /** Notes / links / files for this task while it’s the in-progress focus (role page). */
+  workspaceBlocks?: RoleWorkspaceBlock[]
 }
 
 export type Session = {

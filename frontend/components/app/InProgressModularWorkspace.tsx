@@ -25,6 +25,8 @@ type Props = {
   onUpdateBlocks: (next: RoleWorkspaceBlock[]) => void
   onAddInProgressStep: (title: string) => void
   stepHint: string
+  /** No in-progress focus task — workspace pins are disabled (+ Step still works). */
+  readOnly?: boolean
 }
 
 export function InProgressModularWorkspace({
@@ -32,12 +34,17 @@ export function InProgressModularWorkspace({
   onUpdateBlocks,
   onAddInProgressStep,
   stepHint,
+  readOnly = false,
 }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const blocksRef = useRef(blocks)
   useEffect(() => {
     blocksRef.current = blocks
   }, [blocks])
+
+  useEffect(() => {
+    if (readOnly) setAdder(null)
+  }, [readOnly])
 
   const [adder, setAdder] = useState<null | 'link' | 'step'>(null)
   const [linkUrl, setLinkUrl] = useState('')
@@ -46,24 +53,28 @@ export function InProgressModularWorkspace({
 
   const patchBlock = useCallback(
     (id: string, fn: (b: RoleWorkspaceBlock) => RoleWorkspaceBlock) => {
+      if (readOnly) return
       onUpdateBlocks(blocks.map((b) => (b.id === id ? fn(b) : b)))
     },
-    [blocks, onUpdateBlocks]
+    [blocks, onUpdateBlocks, readOnly]
   )
 
   const removeBlock = useCallback(
     (id: string) => {
+      if (readOnly) return
       onUpdateBlocks(blocks.filter((b) => b.id !== id))
     },
-    [blocks, onUpdateBlocks]
+    [blocks, onUpdateBlocks, readOnly]
   )
 
   const addText = () => {
+    if (readOnly) return
     onUpdateBlocks([...blocks, { id: createId(), type: 'text', body: '' }])
   }
 
   const addLink = (e: FormEvent) => {
     e.preventDefault()
+    if (readOnly) return
     const href = safeHttpUrl(linkUrl)
     if (!href) return
     const label = linkLabel.trim()
@@ -76,9 +87,13 @@ export function InProgressModularWorkspace({
     setAdder(null)
   }
 
-  const onPickFile = () => fileRef.current?.click()
+  const onPickFile = () => {
+    if (readOnly) return
+    fileRef.current?.click()
+  }
 
   const onFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (readOnly) return
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
@@ -115,8 +130,11 @@ export function InProgressModularWorkspace({
     setAdder(null)
   }
 
+  const btnDisabled =
+    'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-40'
+
   return (
-    <div className="space-y-3">
+    <div className={`space-y-3 ${readOnly ? 'opacity-95' : ''}`}>
       <input
         ref={fileRef}
         type="file"
@@ -128,22 +146,25 @@ export function InProgressModularWorkspace({
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
+          disabled={readOnly}
           onClick={addText}
-          className="rounded-lg border border-white/12 bg-white/[0.04] px-2.5 py-1.5 text-xs font-medium text-[var(--color-text-primary)] hover:bg-white/[0.07]"
+          className={`rounded-lg border border-white/12 bg-white/[0.04] px-2.5 py-1.5 text-xs font-medium text-[var(--color-text-primary)] hover:bg-white/[0.07] ${btnDisabled}`}
         >
           + Note
         </button>
         <button
           type="button"
+          disabled={readOnly}
           onClick={() => setAdder((a) => (a === 'link' ? null : 'link'))}
-          className="rounded-lg border border-white/12 bg-white/[0.04] px-2.5 py-1.5 text-xs font-medium text-[var(--color-text-primary)] hover:bg-white/[0.07]"
+          className={`rounded-lg border border-white/12 bg-white/[0.04] px-2.5 py-1.5 text-xs font-medium text-[var(--color-text-primary)] hover:bg-white/[0.07] ${btnDisabled}`}
         >
           + Link
         </button>
         <button
           type="button"
+          disabled={readOnly}
           onClick={onPickFile}
-          className="rounded-lg border border-white/12 bg-white/[0.04] px-2.5 py-1.5 text-xs font-medium text-[var(--color-text-primary)] hover:bg-white/[0.07]"
+          className={`rounded-lg border border-white/12 bg-white/[0.04] px-2.5 py-1.5 text-xs font-medium text-[var(--color-text-primary)] hover:bg-white/[0.07] ${btnDisabled}`}
         >
           + File
         </button>
@@ -219,7 +240,9 @@ export function InProgressModularWorkspace({
 
       {blocks.length === 0 && !adder && (
         <p className="text-sm text-[var(--color-text-faint)]">
-          Add notes, links, or files when you need them — nothing is required up front.
+          {readOnly
+            ? 'Workspace unlocks when at least one task is in progress.'
+            : 'Add notes, links, or files when you need them — nothing is required up front.'}
         </p>
       )}
 
@@ -242,7 +265,8 @@ export function InProgressModularWorkspace({
                 </span>
                 <button
                   type="button"
-                  className="rounded-md px-2 py-0.5 text-[11px] text-rose-300/90 opacity-80 hover:bg-rose-500/15 hover:opacity-100"
+                  disabled={readOnly}
+                  className={`rounded-md px-2 py-0.5 text-[11px] text-rose-300/90 opacity-80 hover:bg-rose-500/15 hover:opacity-100 ${btnDisabled}`}
                   onClick={() => removeBlock(b.id)}
                 >
                   Remove
@@ -250,9 +274,10 @@ export function InProgressModularWorkspace({
               </div>
               {b.type === 'text' && (
                 <textarea
-                  className="min-h-[4rem] w-full resize-y bg-transparent text-sm text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-faint)]"
+                  className="min-h-[4rem] w-full resize-y bg-transparent text-sm text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-faint)] read-only:cursor-default"
                   placeholder="Write anything useful…"
                   value={b.body}
+                  readOnly={readOnly}
                   onChange={(e) =>
                     patchBlock(b.id, () => ({ ...b, body: e.target.value }))
                   }
@@ -298,7 +323,8 @@ export function InProgressModularWorkspace({
                         {image && (
                           <button
                             type="button"
-                            className="text-xs font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+                            disabled={readOnly}
+                            className={`text-xs font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] ${btnDisabled}`}
                             onClick={() =>
                               patchBlock(b.id, (x) =>
                                 x.type === 'file'

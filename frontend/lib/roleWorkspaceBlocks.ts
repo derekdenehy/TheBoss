@@ -1,5 +1,6 @@
 import { createId } from '@/lib/ids'
-import type { Role, RoleWorkspaceBlock } from '@/lib/types'
+import { orderTasksForStatusColumn } from '@/lib/taskTree'
+import type { Role, RoleWorkspaceBlock, Task } from '@/lib/types'
 
 const LEGACY_NOTE_ID = 'legacy-workspace-note'
 const legacyLinkId = (i: number) => `legacy-workspace-link-${i}`
@@ -43,6 +44,38 @@ function hasLegacyPlaceholderIds(blocks: RoleWorkspaceBlock[]): boolean {
 /** Stable ids for normal edits; migrate legacy placeholders only when they are still present. */
 export function finalizeWorkspaceBlocksForSave(blocks: RoleWorkspaceBlock[]): RoleWorkspaceBlock[] {
   return hasLegacyPlaceholderIds(blocks) ? persistableWorkspaceBlocks(blocks) : blocks
+}
+
+/**
+ * Which in-progress task owns the role workspace (same pick as the primary title in the header).
+ */
+export function resolveWorkspaceAnchorTask(
+  tasks: Task[],
+  startHereTaskId: string | null
+): Task | undefined {
+  const rows = orderTasksForStatusColumn(tasks, 'in_progress')
+  if (rows.length === 0) return undefined
+  const start =
+    startHereTaskId &&
+    tasks.find((t) => t.id === startHereTaskId && t.status === 'in_progress')
+  if (start) return start
+  const roots = rows.filter((r) => r.depth === 0)
+  if (roots.length >= 1) return roots[0].task
+  return rows[0].task
+}
+
+/**
+ * Blocks for the anchor task, or role-level legacy data shown until saved onto the task.
+ */
+export function effectiveTaskWorkspaceBlocks(
+  anchor: Task | undefined,
+  role: Role
+): RoleWorkspaceBlock[] {
+  if (!anchor) return []
+  if (anchor.workspaceBlocks && anchor.workspaceBlocks.length > 0) {
+    return anchor.workspaceBlocks
+  }
+  return effectiveWorkspaceBlocks(role)
 }
 
 export function safeHttpUrl(raw: string): string | null {

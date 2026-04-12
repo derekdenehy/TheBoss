@@ -10,6 +10,7 @@ import type {
   NorthStarMetric,
   ProjectContext,
   Session,
+  RoleWorkspaceBlock,
   Task,
   UserGoals,
   UserProfile,
@@ -85,6 +86,42 @@ function normalizeDailyRoutine(raw: unknown): DailyBossRoutine | null {
   }
 }
 
+function normalizeWorkspaceBlocks(raw: unknown): RoleWorkspaceBlock[] | undefined {
+  if (!Array.isArray(raw)) return undefined
+  const out: RoleWorkspaceBlock[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const o = item as Record<string, unknown>
+    const id = typeof o.id === 'string' ? o.id : ''
+    if (!id) continue
+    const type = o.type
+    if (type === 'text' && typeof o.body === 'string') {
+      out.push({ id, type: 'text', body: o.body })
+      continue
+    }
+    if (type === 'link' && typeof o.url === 'string') {
+      out.push({
+        id,
+        type: 'link',
+        url: o.url,
+        ...(typeof o.label === 'string' && o.label.trim() ? { label: o.label.trim() } : {}),
+      })
+      continue
+    }
+    if (type === 'file' && typeof o.dataUrl === 'string' && typeof o.name === 'string') {
+      out.push({
+        id,
+        type: 'file',
+        name: o.name,
+        dataUrl: o.dataUrl,
+        ...(typeof o.mimeType === 'string' ? { mimeType: o.mimeType } : {}),
+        ...(o.hidePreview === true ? { hidePreview: true } : {}),
+      })
+    }
+  }
+  return out.length > 0 ? out : undefined
+}
+
 function normalizeTask(raw: unknown): Task | null {
   if (!raw || typeof raw !== 'object') return null
   const t = raw as Task
@@ -113,6 +150,8 @@ function normalizeTask(raw: unknown): Task | null {
   const sortOrder =
     typeof sortRaw === 'number' && !Number.isNaN(sortRaw) ? Math.floor(sortRaw) : undefined
 
+  const workspaceBlocks = normalizeWorkspaceBlocks((t as Task).workspaceBlocks)
+
   return {
     id: t.id,
     roleId: t.roleId,
@@ -123,6 +162,7 @@ function normalizeTask(raw: unknown): Task | null {
     completedAt: typeof t.completedAt === 'string' ? t.completedAt : undefined,
     ...(parentTaskId ? { parentTaskId } : {}),
     ...(sortOrder !== undefined ? { sortOrder } : {}),
+    ...(workspaceBlocks ? { workspaceBlocks } : {}),
     briefingMeta:
       t.briefingMeta &&
       typeof t.briefingMeta === 'object' &&

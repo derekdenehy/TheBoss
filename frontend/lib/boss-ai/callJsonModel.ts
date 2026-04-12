@@ -61,27 +61,38 @@ async function callAnthropicText(system: string, userContent: string): Promise<s
   const key = process.env.ANTHROPIC_API_KEY?.trim()
   if (!key) throw new Error('ANTHROPIC_API_KEY is not set')
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': key,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: anthropicModel(),
-      max_tokens: 2048,
-      system: `${system}\n\nYou must respond with a single valid JSON object only. No markdown, no prose outside JSON.`,
-      messages: [{ role: 'user', content: userContent }],
-    }),
+  const body = JSON.stringify({
+    model: anthropicModel(),
+    max_tokens: 2048,
+    system: `${system}\n\nYou must respond with a single valid JSON object only. No markdown, no prose outside JSON.`,
+    messages: [{ role: 'user', content: userContent }],
   })
+
+  const attempt = () =>
+    fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+      },
+      body,
+    })
+
+  // Retry up to 5 times on 529 (overloaded) with exponential backoff
+  let res = await attempt()
+  for (let i = 1; i <= 5 && res.status === 529; i++) {
+    await new Promise((r) => setTimeout(r, i * 2000))
+    res = await attempt()
+  }
 
   const raw = (await res.json()) as {
     content?: { type: string; text?: string }[]
-    error?: { message?: string }
+    error?: { message?: string; type?: string }
   }
 
   if (!res.ok) {
+    console.error('[boss-ai] Anthropic error', res.status, JSON.stringify(raw.error))
     throw new Error(raw.error?.message ?? res.statusText)
   }
 

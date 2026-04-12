@@ -66,7 +66,7 @@ type AppActions = {
   ) => void
   updateTask: (
     id: string,
-    patch: Partial<Pick<Task, 'title' | 'status' | 'dueAt'>>
+    patch: Partial<Pick<Task, 'title' | 'status' | 'dueAt' | 'workspaceBlocks'>>
   ) => void
   deleteTask: (id: string) => void
   clockIn: (roleId: string) => ClockInResult
@@ -531,7 +531,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   )
 
   const updateTask = useCallback(
-    (id: string, patch: Partial<Pick<Task, 'title' | 'status' | 'dueAt'>>) => {
+    (
+      id: string,
+      patch: Partial<Pick<Task, 'title' | 'status' | 'dueAt' | 'workspaceBlocks'>>
+    ) => {
       const nowIso = new Date().toISOString()
       const nowMs = Date.now()
       setState((s) => {
@@ -582,6 +585,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           dueAt,
           totalSecondsSpent,
           inProgressStartedAt,
+        }
+
+        if (patch.workspaceBlocks !== undefined) {
+          if (patch.workspaceBlocks.length > 0) {
+            updated.workspaceBlocks = patch.workspaceBlocks
+          } else {
+            delete updated.workspaceBlocks
+          }
         }
 
         const nextWorkingState = syncWorkingStateAfterTaskPatch(

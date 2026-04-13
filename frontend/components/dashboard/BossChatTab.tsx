@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppState } from '@/context/AppStateContext'
-import { eventsTouchingLocalDay } from '@/lib/calendarDay'
+import { eventsTouchingLocalDay, tasksToPromptRows } from '@/lib/calendarDay'
 import { getTodayKey } from '@/lib/dailyBoss'
 
 type Turn = { role: 'user' | 'assistant'; content: string }
@@ -42,11 +42,16 @@ type Props = {
 }
 
 export function BossChatTab({ onOpenBrief }: Props) {
-  const { aiContext, calendarEvents, supabaseConfigured, authUser } = useAppState()
+  const { aiContext, calendarEvents, tasks, getRoleById, supabaseConfigured, authUser } =
+    useAppState()
   const todayYmd = getTodayKey()
   const eventsToday = useMemo(
     () => eventsTouchingLocalDay(calendarEvents, todayYmd),
     [calendarEvents, todayYmd]
+  )
+  const taskDueRows = useMemo(
+    () => tasksToPromptRows(tasks, (id) => getRoleById(id)?.name ?? 'Role'),
+    [tasks, getRoleById]
   )
   const [config, setConfig] = useState<Config | null>(null)
   const [messages, setMessages] = useState<Turn[]>([])
@@ -88,6 +93,7 @@ export function BossChatTab({ onOpenBrief }: Props) {
           aiContext,
           calendarEvents,
           todayLocalDate: todayYmd,
+          taskDueRows,
         }),
         })
         const data = (await res.json()) as { reply?: string; error?: string }
@@ -106,7 +112,7 @@ export function BossChatTab({ onOpenBrief }: Props) {
         setLoading(false)
       }
     },
-    [aiContext, calendarEvents, todayYmd]
+    [aiContext, calendarEvents, todayYmd, taskDueRows]
   )
 
   const sendWithText = useCallback(

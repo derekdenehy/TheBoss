@@ -31,25 +31,10 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/boss/chat/route.js"
     ],
-    "/boss/context/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/boss/context/page.js"
-    ],
     "/boss/role/[id]/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/boss/role/[id]/page.js"
-    ],
-    "/login/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/login/page.js"
-    ],
-    "/api/boss/onboarding/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/boss/onboarding/route.js"
     ]
   }
 }

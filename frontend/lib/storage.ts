@@ -179,11 +179,28 @@ function normalizeTask(raw: unknown): Task | null {
   }
 }
 
+function normalizeCalendarRecurrence(raw: unknown): CalendarEvent['recurrence'] {
+  if (!raw || typeof raw !== 'object') return undefined
+  const o = raw as Record<string, unknown>
+  const freq = o.freq
+  if (freq !== 'daily' && freq !== 'weekly' && freq !== 'monthly') return undefined
+  const interval =
+    typeof o.interval === 'number' && o.interval > 0 ? Math.min(99, Math.floor(o.interval)) : undefined
+  const until =
+    typeof o.until === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.until) ? o.until : undefined
+  return {
+    freq,
+    ...(interval !== undefined ? { interval } : {}),
+    ...(until ? { until } : {}),
+  }
+}
+
 function normalizeCalendarEvent(raw: unknown): CalendarEvent | null {
   if (!raw || typeof raw !== 'object') return null
   const e = raw as CalendarEvent
   if (typeof e.id !== 'string' || typeof e.title !== 'string' || typeof e.startsAt !== 'string')
     return null
+  const recurrence = normalizeCalendarRecurrence((e as { recurrence?: unknown }).recurrence)
   return {
     id: e.id,
     title: e.title,
@@ -191,6 +208,7 @@ function normalizeCalendarEvent(raw: unknown): CalendarEvent | null {
     endsAt: typeof e.endsAt === 'string' ? e.endsAt : undefined,
     location: typeof e.location === 'string' ? e.location : undefined,
     notes: typeof e.notes === 'string' ? e.notes : undefined,
+    ...(recurrence ? { recurrence } : {}),
     createdAt: typeof e.createdAt === 'string' ? e.createdAt : new Date().toISOString(),
   }
 }

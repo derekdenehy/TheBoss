@@ -1,7 +1,5 @@
 {
-  "/page": "app/page.js",
-  "/login/page": "app/login/page.js",
+  "/api/boss/chat/route": "app/api/boss/chat/route.js",
   "/boss/page": "app/boss/page.js",
-  "/boss/context/page": "app/boss/context/page.js",
   "/boss/role/[id]/page": "app/boss/role/[id]/page.js"
 }

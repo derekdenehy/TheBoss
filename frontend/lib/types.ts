@@ -109,6 +109,16 @@ export type DailyBossRoutine = {
   committedAt: string | null
 }
 
+export type CalendarRecurrenceFreq = 'daily' | 'weekly' | 'monthly'
+
+export type CalendarRecurrence = {
+  freq: CalendarRecurrenceFreq
+  /** Repeat every N periods; default 1 */
+  interval?: number
+  /** Inclusive end date YYYY-MM-DD (local); omit = repeats without an end in the app */
+  until?: string
+}
+
 export type CalendarEvent = {
   id: string
   title: string
@@ -117,6 +127,8 @@ export type CalendarEvent = {
   endsAt?: string
   location?: string
   notes?: string
+  /** When set, the event repeats from its first local start day per rule. */
+  recurrence?: CalendarRecurrence
   createdAt: string
 }
 

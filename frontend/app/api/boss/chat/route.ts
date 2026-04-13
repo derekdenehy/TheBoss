@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server'
 import { callBossChatModel, type ChatTurn } from '@/lib/boss-ai/callModel'
 import { getBossAiPublicConfig, resolveBossAiProvider } from '@/lib/boss-ai/config'
-import { formatTodayCalendarBlock } from '@/lib/calendarDay'
+import {
+  formatTasksDueHorizonBlock,
+  formatTodayCalendarBlock,
+  type TaskDuePromptRow,
+} from '@/lib/calendarDay'
 import { formatAIContextForPrompt } from '@/lib/aiContext'
 import type { AIContext, CalendarEvent } from '@/lib/types'
 
@@ -17,6 +21,7 @@ type Body = {
   aiContext?: unknown
   calendarEvents?: unknown
   todayLocalDate?: unknown
+  taskDueRows?: unknown
 }
 
 function sanitizeCalendarEvents(x: unknown): CalendarEvent[] {
@@ -28,6 +33,22 @@ function sanitizeCalendarEvents(x: unknown): CalendarEvent[] {
       typeof (e as CalendarEvent).startsAt === 'string' &&
       typeof (e as CalendarEvent).title === 'string'
   )
+}
+
+function sanitizeTaskDueRows(x: unknown): TaskDuePromptRow[] {
+  if (!Array.isArray(x)) return []
+  const out: TaskDuePromptRow[] = []
+  for (const t of x) {
+    if (!t || typeof t !== 'object') continue
+    const o = t as Record<string, unknown>
+    if (typeof o.title !== 'string') continue
+    const status = typeof o.status === 'string' ? o.status : 'todo'
+    const roleName = typeof o.roleName === 'string' ? o.roleName : 'Role'
+    const dueAt =
+      typeof o.dueAt === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.dueAt) ? o.dueAt : undefined
+    out.push({ title: o.title, status, roleName, dueAt })
+  }
+  return out
 }
 
 function isChatTurns(x: unknown): x is ChatTurn[] {
@@ -101,7 +122,12 @@ export async function POST(req: Request) {
       ? formatTodayCalendarBlock(sanitizeCalendarEvents(body.calendarEvents), todayYmd)
       : '## Calendar\nNo local date supplied; skip calendar-specific nudges.'
 
-  const system = `You are Boss, the orchestration layer for this user's workday. You only know what appears in the structured context below, the calendar section, and this chat. Do not invent goals, projects, or tasks that are not implied there.
+  const tasksBlock =
+    todayYmd !== ''
+      ? formatTasksDueHorizonBlock(sanitizeTaskDueRows(body.taskDueRows), todayYmd)
+      : '## Tasks (due dates)\nSkipped — no local date supplied.'
+
+  const system = `You are Boss, the orchestration layer for this user's workday. You only know what appears in the structured context below, the calendar section, the task due section, and this chat. Do not invent goals, projects, or tasks that are not implied there.
 
 How to think (in order — mirror this in answers when helpful):
 1) Working state — what is in progress, urgent, blocked, or being avoided right now.
@@ -109,13 +135,16 @@ How to think (in order — mirror this in answers when helpful):
 3) Projects — use names, phase, workstreams, bottlenecks when choosing where to spend attention.
 4) Profile — phrase suggestions in their preferred task style when known; preferredTaskStyle / warm-up / commonBlockers may be empty — that is normal. If empty, do not nag; you may infer gentle phrasing from how they write. Over time the user can share preferences in chat (no separate form required).
 
-Calendar behaviour:
-- If something is clearly due or happening **today** (see calendar section), open with a friendly check-in: e.g. whether they've thought about starting an assignment — supportive, not parental.
-- If **nothing** is on the calendar for today, you may propose a **tentative rank order** of their projects using goals + bottlenecks + phase. Present it as numbered list and ask them to **confirm or reorder** — make clear your order is a draft.
+Calendar + due dates:
+- Combine **calendar events** with **tasks due today or soon**: if a task is due today, treat it like a hard commitment alongside calendar entries.
+- If something is clearly due or happening **today**, open with a friendly check-in when appropriate — supportive, not parental.
+- If **nothing** is on the calendar or due list for today, you may propose a **tentative rank order** of their projects using goals + bottlenecks + phase. Present it as numbered list and ask them to **confirm or reorder** — make clear your order is a draft.
 
 Output style: default to ONE clear primary recommendation for what to do next when relevant, optionally up to two alternates. Use short bullets or tight paragraphs. Ask at most one clarifying question only if the context is empty or contradictory.
 
 ${calendarBlock}
+
+${tasksBlock}
 
 Structured context:
 ${contextBlock}`

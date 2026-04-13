@@ -52,3 +52,37 @@ export function eventToLocalDateKey(isoLike: string): string {
   if (Number.isNaN(d.getTime())) return ''
   return toLocalDateKey(d)
 }
+
+export function addDaysToYmd(ymd: string, deltaDays: number): string {
+  const d = parseLocalDateKey(ymd)
+  if (!d) return ymd
+  const n = new Date(d.getFullYear(), d.getMonth(), d.getDate() + deltaDays)
+  return toLocalDateKey(n)
+}
+
+/** Week range Sunday → Saturday (inclusive), local dates. */
+export function weekRangeSundayContaining(ymd: string): { start: string; end: string } {
+  const d = parseLocalDateKey(ymd)
+  if (!d) return { start: ymd, end: ymd }
+  const day = d.getDay()
+  const start = new Date(d.getFullYear(), d.getMonth(), d.getDate() - day)
+  const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6)
+  return { start: toLocalDateKey(start), end: toLocalDateKey(end) }
+}
+
+export function yearMonthFromYmd(ymd: string): YearMonth | null {
+  const d = parseLocalDateKey(ymd)
+  if (!d) return null
+  return { year: d.getFullYear(), month: d.getMonth() }
+}
+
+export function shiftMonthPreserveDay(ymd: string, deltaMonths: number): string {
+  const d = parseLocalDateKey(ymd)
+  if (!d) return ymd
+  const y = d.getFullYear()
+  const m = d.getMonth() + deltaMonths
+  const target = new Date(y, m, 1)
+  const dim = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate()
+  const day = Math.min(d.getDate(), dim)
+  return `${target.getFullYear()}-${pad2(target.getMonth() + 1)}-${pad2(day)}`
+}

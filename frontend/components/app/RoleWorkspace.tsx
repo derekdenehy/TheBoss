@@ -14,6 +14,7 @@ import {
 import { orderTasksForStatusColumn } from '@/lib/taskTree'
 import type { RoleWorkspaceBlock, Session } from '@/lib/types'
 import { InProgressModularWorkspace } from './InProgressModularWorkspace'
+import { RoleCompletedSnapshot } from './RoleCompletedSnapshot'
 import { SessionSummaryModal } from './SessionSummaryModal'
 import { SessionTimer } from './SessionTimer'
 import { TaskList } from './TaskList'
@@ -347,6 +348,8 @@ export function RoleWorkspace({ roleId }: Props) {
           )}
         </section>
       )}
+
+      <RoleCompletedSnapshot roleId={roleId} />
 
       <section className="mt-10">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">

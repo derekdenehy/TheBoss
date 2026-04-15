@@ -50,7 +50,7 @@ export function AIContextPage() {
         </button>
       </header>
 
-      <BossContextBrief onOpenFocus={() => router.push('/boss')} />
+      <BossContextBrief onJumpToChat={() => router.push('/boss')} />
     </div>
   )
 }

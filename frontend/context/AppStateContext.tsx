@@ -13,6 +13,7 @@ import {
 import { earningsForElapsedSeconds } from '@/lib/earnings'
 import { createId } from '@/lib/ids'
 import { finalizeSessionSnapshot, usesRouteBilling } from '@/lib/sessionUtils'
+import { tasksCompletedInSessionWindow } from '@/lib/calendarDay'
 import { emptyDailyBossRoutine, getTodayKey } from '@/lib/dailyBoss'
 import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { isSupabaseConfigured } from '@/lib/supabase/env'
@@ -62,7 +63,13 @@ type AppActions = {
   addTask: (
     roleId: string,
     title: string,
-    options?: { briefingMeta?: TaskBriefingMeta; parentTaskId?: string; status?: Task['status'] }
+    options?: {
+      briefingMeta?: TaskBriefingMeta
+      parentTaskId?: string
+      status?: Task['status']
+      /** Due date YYYY-MM-DD (local calendar day) */
+      dueAt?: string
+    }
   ) => void
   updateTask: (
     id: string,
@@ -494,7 +501,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     (
       roleId: string,
       title: string,
-      options?: { briefingMeta?: TaskBriefingMeta; parentTaskId?: string; status?: Task['status'] }
+      options?: {
+        briefingMeta?: TaskBriefingMeta
+        parentTaskId?: string
+        status?: Task['status']
+        dueAt?: string
+      }
     ) => {
       const t = title.trim()
       if (!t) return
@@ -511,6 +523,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         const status = options?.status ?? (inheritInProgress ? 'in_progress' : 'todo')
         const inProgressStartedAt = status === 'in_progress' ? now : undefined
         const completedAt = status === 'done' ? now : undefined
+        const dueOpt = options?.dueAt?.trim()
+        const dueAt =
+          dueOpt && /^\d{4}-\d{2}-\d{2}$/.test(dueOpt) ? dueOpt : undefined
         const task: Task = {
           id: createId(),
           roleId,
@@ -523,6 +538,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           ...(options?.briefingMeta ? { briefingMeta: options.briefingMeta } : {}),
           ...(inProgressStartedAt ? { inProgressStartedAt } : {}),
           ...(completedAt ? { completedAt } : {}),
+          ...(dueAt ? { dueAt } : {}),
         }
         return { ...s, tasks: [...s.tasks, task] }
       })
@@ -988,15 +1004,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const tasksCompletedDuringSession = useCallback(
-    (session: Session) => {
-      const start = new Date(session.startTime).getTime()
-      const end = session.endTime ? new Date(session.endTime).getTime() : Date.now()
-      return state.tasks.filter((t) => {
-        if (t.roleId !== session.roleId || t.status !== 'done' || !t.completedAt) return false
-        const c = new Date(t.completedAt).getTime()
-        return c >= start && c <= end
-      })
-    },
+    (session: Session) => tasksCompletedInSessionWindow(state.tasks, session),
     [state.tasks]
   )
 

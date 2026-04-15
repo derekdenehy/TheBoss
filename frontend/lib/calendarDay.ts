@@ -1,4 +1,4 @@
-import type { CalendarEvent, Task } from './types'
+import type { CalendarEvent, Session, Task } from './types'
 import { calendarEventTouchesLocalDay, displayScheduleOnDay } from './calendarRecurrence'
 
 /** Local calendar YYYY-MM-DD for an ISO timestamp. */
@@ -105,4 +105,55 @@ export function formatTodayCalendarBlock(events: CalendarEvent[], todayYmd: stri
     return `- ${e.title.trim() || 'Untitled'}${time ? ` (${time})` : ''}${recur}${note ? ` · note: ${note}` : ''}`
   })
   return `## Calendar — today (${todayYmd})\nFixed and recurring events touching this day. Nudge gently on deadlines and time-bound items.\n${lines.join('\n')}`
+}
+
+/**
+ * Tasks marked done whose `completedAt` falls on this local calendar day (same local date rules as
+ * `localDateKeyFromIso`). Requires `completedAt`; legacy done tasks without it are excluded.
+ */
+export function tasksCompletedOnLocalDay(tasks: Task[], dayYmd: string): Task[] {
+  return tasks.filter((t) => {
+    if (t.status !== 'done' || !t.completedAt) return false
+    return localDateKeyFromIso(t.completedAt) === dayYmd
+  })
+}
+
+/**
+ * Tasks completed while a role clock-in session was open: same role, `completedAt` in
+ * [session.startTime, session.endTime ?? nowRef]. Used for session summaries and dashboard.
+ */
+export function tasksCompletedInSessionWindow(
+  tasks: Task[],
+  session: Session,
+  nowRef: number = Date.now()
+): Task[] {
+  const start = new Date(session.startTime).getTime()
+  const end = session.endTime ? new Date(session.endTime).getTime() : nowRef
+  return tasks.filter((t) => {
+    if (t.roleId !== session.roleId || t.status !== 'done' || !t.completedAt) return false
+    const c = new Date(t.completedAt).getTime()
+    return c >= start && c <= end
+  })
+}
+
+/**
+ * Done tasks whose completion time fell inside any *active* clock-in session (union across roles).
+ * Empty when nothing is clocked in.
+ */
+export function tasksCompletedDuringAnyActiveSession(
+  tasks: Task[],
+  sessions: Session[],
+  nowRef: number = Date.now()
+): Task[] {
+  const active = sessions.filter((s) => s.active)
+  if (active.length === 0) return []
+  const byId = new Map<string, Task>()
+  for (const session of active) {
+    for (const t of tasksCompletedInSessionWindow(tasks, session, nowRef)) {
+      byId.set(t.id, t)
+    }
+  }
+  return Array.from(byId.values()).sort(
+    (a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime()
+  )
 }

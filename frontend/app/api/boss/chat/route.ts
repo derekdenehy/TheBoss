@@ -22,6 +22,8 @@ type Body = {
   calendarEvents?: unknown
   todayLocalDate?: unknown
   taskDueRows?: unknown
+  /** Role names only (for task capture); ids are not used from this payload. */
+  roles?: unknown
 }
 
 function sanitizeCalendarEvents(x: unknown): CalendarEvent[] {
@@ -61,6 +63,24 @@ function isChatTurns(x: unknown): x is ChatTurn[] {
       ((m as ChatTurn).role === 'user' || (m as ChatTurn).role === 'assistant') &&
       typeof (m as ChatTurn).content === 'string'
   )
+}
+
+function formatRolesForPrompt(names: string[]): string {
+  if (names.length === 0) {
+    return 'The user has no roles yet. They need at least one role (sidebar: + New role) before tasks can be filed. If they ask to add a todo, say so and end with BOSS_ACTIONS_JSON: []'
+  }
+  return names.map((n) => `- ${n}`).join('\n')
+}
+
+function sanitizeRoleNames(x: unknown): string[] {
+  if (!Array.isArray(x)) return []
+  const out: string[] = []
+  for (const r of x) {
+    if (!r || typeof r !== 'object') continue
+    const n = (r as Record<string, unknown>).name
+    if (typeof n === 'string' && n.trim()) out.push(n.trim())
+  }
+  return out
 }
 
 function isAIContext(x: unknown): x is AIContext {
@@ -127,6 +147,9 @@ export async function POST(req: Request) {
       ? formatTasksDueHorizonBlock(sanitizeTaskDueRows(body.taskDueRows), todayYmd)
       : '## Tasks (due dates)\nSkipped — no local date supplied.'
 
+  const roleNames = sanitizeRoleNames(body.roles)
+  const rolesBlock = `## Roles (task buckets)\n${formatRolesForPrompt(roleNames)}`
+
   const system = `You are Boss, the orchestration layer for this user's workday. You only know what appears in the structured context below, the calendar section, the task due section, and this chat. Do not invent goals, projects, or tasks that are not implied there.
 
 How to think (in order — mirror this in answers when helpful):
@@ -141,6 +164,15 @@ Calendar + due dates:
 - If **nothing** is on the calendar or due list for today, you may propose a **tentative rank order** of their projects using goals + bottlenecks + phase. Present it as numbered list and ask them to **confirm or reorder** — make clear your order is a draft.
 
 Output style: default to ONE clear primary recommendation for what to do next when relevant, optionally up to two alternates. Use short bullets or tight paragraphs. Ask at most one clarifying question only if the context is empty or contradictory.
+
+Todo capture (required protocol when the user asks to add, remember, or track a task/todo/reminder):
+- Reply in normal prose first (confirm what you understood).
+- Then output **exactly one** extra line at the **very end** of your message: a line starting with BOSS_ACTIONS_JSON: immediately followed by a JSON array (no markdown code fences, no text after the array on that line).
+- Each array element must be like: {"type":"create_task","roleName":"<must match one of the role names under Roles, or the role they clearly mean>","title":"<concise title>","dueAt":null} or dueAt as "YYYY-MM-DD" when they gave a date.
+- If you are not adding any tasks this turn, the array must be empty: BOSS_ACTIONS_JSON: []
+- Infer roleName from what they said (e.g. "for work", a project that belongs to a role). If you truly cannot pick a role from the Roles list, ask them in prose and use BOSS_ACTIONS_JSON: []
+
+${rolesBlock}
 
 ${calendarBlock}
 

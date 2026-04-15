@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { getTodayKey } from '@/lib/dailyBoss'
 import {
   addDaysToYmd,
@@ -20,6 +20,8 @@ const WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 type CalendarViewMode = 'month' | 'week' | 'day'
 
+type CalendarEntryKind = 'event' | 'task'
+
 const PREVIEW_CHARS = 22
 const MAX_PREVIEWS = 3
 
@@ -33,6 +35,19 @@ function recurrenceLabel(freq: CalendarRecurrenceFreq): string {
   if (freq === 'daily') return 'Daily'
   if (freq === 'weekly') return 'Weekly'
   return 'Monthly'
+}
+
+/** Parse "9:00", "09:00", "14:30" → "09:00" / "14:30"; invalid or empty → null */
+function parseHmTo24(raw: string): string | null {
+  const t = raw.trim()
+  if (!t) return null
+  const m = /^(\d{1,2}):(\d{2})$/.exec(t)
+  if (!m) return null
+  const h = Number(m[1])
+  const min = Number(m[2])
+  if (!Number.isInteger(h) || !Number.isInteger(min) || h < 0 || h > 23 || min < 0 || min > 59)
+    return null
+  return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`
 }
 
 type DayBlock = { events: CalendarEvent[]; tasks: Task[] }
@@ -71,9 +86,10 @@ export function BossCalendarTab() {
   const {
     calendarEvents,
     tasks,
+    roles,
     addCalendarEvent,
+    addTask,
     deleteCalendarEvent,
-    updateTask,
     getRoleById,
   } = useAppState()
 
@@ -133,14 +149,26 @@ export function BossCalendarTab() {
 
   const selectedTasks = selectedBlock.tasks
 
-  const [evTitle, setEvTitle] = useState('')
+  const [entryKind, setEntryKind] = useState<CalendarEntryKind>('event')
+  const [addTitle, setAddTitle] = useState('')
   const [evStart, setEvStart] = useState('09:00')
   const [evEnd, setEvEnd] = useState('')
   const [evLoc, setEvLoc] = useState('')
   const [evNotes, setEvNotes] = useState('')
   const [evRecurrence, setEvRecurrence] = useState<'none' | CalendarRecurrenceFreq>('none')
   const [evRecUntil, setEvRecUntil] = useState('')
-  const [taskPick, setTaskPick] = useState('')
+  const [newTaskRoleId, setNewTaskRoleId] = useState('')
+
+  useEffect(() => {
+    if (roles.length === 0) {
+      setNewTaskRoleId('')
+      return
+    }
+    setNewTaskRoleId((prev) => {
+      if (prev && roles.some((r) => r.id === prev)) return prev
+      return roles[0]?.id ?? ''
+    })
+  }, [roles])
 
   const navPrev = () => {
     if (viewMode === 'month') setSelectedKey((k) => shiftMonthPreserveDay(k, -1))
@@ -173,52 +201,52 @@ export function BossCalendarTab() {
     return `${displayYm.year}–${String(displayYm.month + 1).padStart(2, '0')}`
   }, [viewMode, selectedKey, displayYm])
 
-  const submitEvent = (e: FormEvent) => {
+  const submitEntry = (e: FormEvent) => {
     e.preventDefault()
-    const title = evTitle.trim()
+    const title = addTitle.trim()
     if (!title) return
-    const localStart = `${selectedKey}T${evStart}:00`
-    const startDate = new Date(localStart)
-    if (Number.isNaN(startDate.getTime())) return
-    let endsAt: string | undefined
-    if (evEnd.trim()) {
-      const endDate = new Date(`${selectedKey}T${evEnd}:00`)
-      if (!Number.isNaN(endDate.getTime())) endsAt = endDate.toISOString()
+
+    if (entryKind === 'event') {
+      const startHm = parseHmTo24(evStart)
+      if (!startHm) return
+      const localStart = `${selectedKey}T${startHm}:00`
+      const startDate = new Date(localStart)
+      if (Number.isNaN(startDate.getTime())) return
+      let endsAt: string | undefined
+      const endHm = parseHmTo24(evEnd)
+      if (endHm) {
+        const endDate = new Date(`${selectedKey}T${endHm}:00`)
+        if (!Number.isNaN(endDate.getTime())) endsAt = endDate.toISOString()
+      }
+      const recurrence =
+        evRecurrence === 'none'
+          ? undefined
+          : {
+              freq: evRecurrence,
+              ...(evRecUntil.trim() && /^\d{4}-\d{2}-\d{2}$/.test(evRecUntil.trim())
+                ? { until: evRecUntil.trim() }
+                : {}),
+            }
+      addCalendarEvent({
+        title,
+        startsAt: startDate.toISOString(),
+        endsAt,
+        location: evLoc.trim() || undefined,
+        notes: evNotes.trim() || undefined,
+        ...(recurrence ? { recurrence } : {}),
+      })
+      setAddTitle('')
+      setEvEnd('')
+      setEvNotes('')
+      setEvRecurrence('none')
+      setEvRecUntil('')
+      return
     }
-    const recurrence =
-      evRecurrence === 'none'
-        ? undefined
-        : {
-            freq: evRecurrence,
-            ...(evRecUntil.trim() && /^\d{4}-\d{2}-\d{2}$/.test(evRecUntil.trim())
-              ? { until: evRecUntil.trim() }
-              : {}),
-          }
-    addCalendarEvent({
-      title,
-      startsAt: startDate.toISOString(),
-      endsAt,
-      location: evLoc.trim() || undefined,
-      notes: evNotes.trim() || undefined,
-      ...(recurrence ? { recurrence } : {}),
-    })
-    setEvTitle('')
-    setEvNotes('')
-    setEvRecurrence('none')
-    setEvRecUntil('')
-  }
 
-  const assignDue = (e: FormEvent) => {
-    e.preventDefault()
-    if (!taskPick) return
-    updateTask(taskPick, { dueAt: selectedKey })
-    setTaskPick('')
+    if (!newTaskRoleId) return
+    addTask(newTaskRoleId, title, { dueAt: selectedKey })
+    setAddTitle('')
   }
-
-  const tasksWithoutDue = useMemo(
-    () => tasks.filter((t) => !t.dueAt && t.status !== 'done'),
-    [tasks]
-  )
 
   const renderMonthDayCell = (key: string, dayNum: number) => {
     const block = dayBlocks.get(key) ?? { events: [], tasks: [] }
@@ -596,105 +624,169 @@ export function BossCalendarTab() {
           </div>
         )}
 
-        <form onSubmit={submitEvent} className="panel-card space-y-3 p-4">
-          <p className="text-sm font-semibold text-[var(--color-text-primary)]">New event</p>
+        <form onSubmit={submitEntry} className="panel-card relative z-[1] space-y-3 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-[var(--color-text-primary)]">Add to calendar</p>
+            <div className="flex gap-1 rounded-lg border border-white/[0.08] p-0.5" role="tablist" aria-label="Entry type">
+              {(['event', 'task'] as const).map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  role="tab"
+                  aria-selected={entryKind === kind}
+                  onClick={() => setEntryKind(kind)}
+                  className={`rounded-md px-2.5 py-1.5 text-xs font-medium transition ${
+                    entryKind === kind
+                      ? kind === 'event'
+                        ? 'bg-sky-500/25 text-sky-100'
+                        : 'bg-amber-500/25 text-amber-100'
+                      : 'text-[var(--color-text-muted)] hover:bg-white/[0.04]'
+                  }`}
+                >
+                  {kind === 'event' ? 'Event' : 'Task'}
+                </button>
+              ))}
+            </div>
+          </div>
+          <p className="text-xs text-[var(--color-text-muted)]">
+            Selected day:{' '}
+            <strong className="text-[var(--color-text-primary)]">{selectedKey}</strong>
+            {' — '}
+            {entryKind === 'event'
+              ? 'Times are on that day in your local timezone.'
+              : 'Task is due that day; pick which role it belongs to.'}
+          </p>
           <input
             required
-            placeholder="Title"
-            value={evTitle}
-            onChange={(e) => setEvTitle(e.target.value)}
-            className="w-full rounded-lg border border-white/10 bg-[var(--color-bg-deep)] px-3 py-2 text-sm outline-none focus:border-sky-500/40"
+            placeholder={entryKind === 'event' ? 'Title' : 'Task title'}
+            value={addTitle}
+            onChange={(e) => setAddTitle(e.target.value)}
+            className={`w-full rounded-lg border border-white/10 bg-[var(--color-bg-deep)] px-3 py-2 text-sm outline-none ${
+              entryKind === 'event' ? 'focus:border-sky-500/40' : 'focus:border-amber-500/40'
+            }`}
           />
-          <div className="grid grid-cols-2 gap-2">
-            <label className="text-xs text-[var(--color-text-faint)]">
-              Start
-              <input
-                type="time"
-                value={evStart}
-                onChange={(e) => setEvStart(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-white/10 bg-[var(--color-bg-deep)] px-2 py-1.5 text-sm outline-none"
-              />
-            </label>
-            <label className="text-xs text-[var(--color-text-faint)]">
-              End (optional)
-              <input
-                type="time"
-                value={evEnd}
-                onChange={(e) => setEvEnd(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-white/10 bg-[var(--color-bg-deep)] px-2 py-1.5 text-sm outline-none"
-              />
-            </label>
-          </div>
-          <label className="block text-xs text-[var(--color-text-faint)]">
-            Repeat
-            <select
-              value={evRecurrence}
-              onChange={(e) => setEvRecurrence(e.target.value as 'none' | CalendarRecurrenceFreq)}
-              className="mt-1 w-full rounded-lg border border-white/10 bg-[var(--color-bg-deep)] px-3 py-2 text-sm outline-none"
-            >
-              <option value="none">Does not repeat</option>
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-            </select>
-          </label>
-          {evRecurrence !== 'none' && (
-            <label className="block text-xs text-[var(--color-text-faint)]">
-              End repeat (optional)
-              <input
-                type="date"
-                value={evRecUntil}
-                onChange={(e) => setEvRecUntil(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-white/10 bg-[var(--color-bg-deep)] px-3 py-2 text-sm outline-none"
-              />
-            </label>
-          )}
-          <input
-            placeholder="Location (optional)"
-            value={evLoc}
-            onChange={(e) => setEvLoc(e.target.value)}
-            className="w-full rounded-lg border border-white/10 bg-[var(--color-bg-deep)] px-3 py-2 text-sm outline-none focus:border-sky-500/40"
-          />
-          <textarea
-            placeholder="Notes (optional) — Boss sees calendar details in Focus when relevant"
-            value={evNotes}
-            onChange={(e) => setEvNotes(e.target.value)}
-            className="min-h-[4rem] w-full rounded-lg border border-white/10 bg-[var(--color-bg-deep)] px-3 py-2 text-sm outline-none focus:border-sky-500/40"
-          />
-          <button
-            type="submit"
-            className="w-full rounded-xl bg-sky-500/90 py-2.5 text-sm font-semibold text-slate-950 hover:bg-sky-400"
-          >
-            Add to {selectedKey}
-          </button>
-        </form>
 
-        <form onSubmit={assignDue} className="panel-card space-y-3 p-4">
-          <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-            Assign task due date
-          </p>
-          <p className="text-xs text-[var(--color-text-muted)]">
-            Sets due on <strong className="text-[var(--color-text-primary)]">{selectedKey}</strong>
-          </p>
-          <select
-            value={taskPick}
-            onChange={(e) => setTaskPick(e.target.value)}
-            className="w-full rounded-lg border border-white/10 bg-[var(--color-bg-deep)] px-3 py-2 text-sm outline-none focus:border-sky-500/40"
-          >
-            <option value="">Choose a task without a due date…</option>
-            {tasksWithoutDue.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.title} · {getRoleById(t.roleId)?.name ?? '?'}
-              </option>
+          {entryKind === 'event' && (
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-xs text-[var(--color-text-faint)]">
+                Start (24h)
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  spellCheck={false}
+                  title="24-hour time, e.g. 09:00 or 14:30"
+                  placeholder="09:00"
+                  value={evStart}
+                  onChange={(e) => setEvStart(e.target.value)}
+                  onBlur={() => {
+                    const n = parseHmTo24(evStart)
+                    if (n) setEvStart(n)
+                  }}
+                  className="mt-1 w-full min-w-0 rounded-lg border border-white/10 bg-[var(--color-bg-deep)] px-3 py-2 text-sm tabular-nums outline-none focus:border-sky-500/40"
+                />
+              </label>
+              <label className="text-xs text-[var(--color-text-faint)]">
+                End (optional)
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  spellCheck={false}
+                  title="24-hour time, leave blank for no end time"
+                  placeholder="17:00"
+                  value={evEnd}
+                  onChange={(e) => setEvEnd(e.target.value)}
+                  onBlur={(e) => {
+                    const v = e.target.value
+                    const n = parseHmTo24(v)
+                    if (n) setEvEnd(n)
+                    else if (!v.trim()) setEvEnd('')
+                  }}
+                  className="mt-1 w-full min-w-0 rounded-lg border border-white/10 bg-[var(--color-bg-deep)] px-3 py-2 text-sm tabular-nums outline-none focus:border-sky-500/40"
+                />
+              </label>
+            </div>
+          )}
+
+          {entryKind === 'task' &&
+            (roles.length === 0 ? (
+              <p className="text-sm text-[var(--color-text-muted)]">
+                Add a role from the sidebar first — tasks belong to a role.
+              </p>
+            ) : (
+              <label className="block text-xs text-[var(--color-text-faint)]">
+                Role
+                <select
+                  required
+                  value={newTaskRoleId}
+                  onChange={(e) => setNewTaskRoleId(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-white/10 bg-[var(--color-bg-deep)] px-3 py-2 text-sm outline-none"
+                >
+                  {roles.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
             ))}
-          </select>
+
           <button
             type="submit"
-            disabled={!taskPick}
-            className="w-full rounded-xl border border-white/15 py-2.5 text-sm font-medium text-[var(--color-text-primary)] hover:bg-white/[0.04] disabled:opacity-40"
+            disabled={entryKind === 'task' && roles.length === 0}
+            className={`w-full rounded-xl py-2.5 text-sm font-semibold transition disabled:opacity-40 ${
+              entryKind === 'event'
+                ? 'bg-sky-500/90 text-slate-950 hover:bg-sky-400'
+                : 'border border-amber-500/35 bg-amber-500/15 text-amber-50/95 hover:bg-amber-500/25'
+            }`}
           >
-            Set due date
+            {entryKind === 'event' ? `Add event on ${selectedKey}` : `Add task due ${selectedKey}`}
           </button>
+
+          {entryKind === 'event' && (
+            <div className="space-y-3 border-t border-white/[0.06] pt-3">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--color-text-faint)]">
+                Optional
+              </p>
+              <label className="block text-xs text-[var(--color-text-faint)]">
+                Repeat
+                <select
+                  value={evRecurrence}
+                  onChange={(e) => setEvRecurrence(e.target.value as 'none' | CalendarRecurrenceFreq)}
+                  className="mt-1 w-full rounded-lg border border-white/10 bg-[var(--color-bg-deep)] px-3 py-2 text-sm outline-none"
+                >
+                  <option value="none">Does not repeat</option>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </label>
+              {evRecurrence !== 'none' && (
+                <label className="block text-xs text-[var(--color-text-faint)]">
+                  End repeat (optional)
+                  <input
+                    type="date"
+                    value={evRecUntil}
+                    onChange={(e) => setEvRecUntil(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-[var(--color-bg-deep)] px-3 py-2 text-sm outline-none"
+                  />
+                </label>
+              )}
+              <input
+                placeholder="Location (optional)"
+                value={evLoc}
+                onChange={(e) => setEvLoc(e.target.value)}
+                className="w-full rounded-lg border border-white/10 bg-[var(--color-bg-deep)] px-3 py-2 text-sm outline-none focus:border-sky-500/40"
+              />
+              <textarea
+                placeholder="Notes (optional) — Boss sees calendar details in Focus when relevant"
+                value={evNotes}
+                onChange={(e) => setEvNotes(e.target.value)}
+                className="min-h-[4rem] w-full rounded-lg border border-white/10 bg-[var(--color-bg-deep)] px-3 py-2 text-sm outline-none focus:border-sky-500/40"
+              />
+            </div>
+          )}
         </form>
       </div>
     </div>

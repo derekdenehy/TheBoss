@@ -139,7 +139,7 @@ export function TaskList({
                     marginLeft: depth > 0 ? Math.min(depth, 8) * 14 : undefined,
                   }}
                 >
-                  <div className="flex gap-2 sm:gap-2.5">
+                  <div className="flex min-w-0 flex-1 gap-2 sm:gap-2.5">
                     {task.status === 'done' ? (
                       <button
                         type="button"
@@ -176,7 +176,7 @@ export function TaskList({
                       <p className="mb-1 text-[10px] text-[var(--color-text-faint)]">{subRowHint}</p>
                     )}
                     <input
-                      className={`w-full bg-transparent text-sm outline-none placeholder:text-[var(--color-text-faint)] ${
+                      className={`min-w-0 w-full max-w-full bg-transparent text-sm outline-none placeholder:text-[var(--color-text-faint)] ${
                         isDone
                           ? 'text-[var(--color-text-muted)] line-through decoration-emerald-500/40'
                           : 'text-[var(--color-text-primary)]'

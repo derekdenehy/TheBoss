@@ -14,14 +14,13 @@ import { BossChatTab } from './BossChatTab'
 import { BossKpisTab } from './BossKpisTab'
 
 const TABS: { id: BossTab; label: string }[] = [
-  { id: 'chat', label: 'Focus' },
   { id: 'brief', label: 'Brief' },
   { id: 'calendar', label: 'Calendar' },
   { id: 'kpis', label: 'KPIs' },
 ]
 
 export function BossDashboard() {
-  const [tab, setTab] = useState<BossTab>('chat')
+  const [tab, setTab] = useState<BossTab>('brief')
   const [saveBannerDismissed, setSaveBannerDismissed] = useState(false)
   const {
     hydrated,
@@ -125,7 +124,7 @@ export function BossDashboard() {
             <a href="/login" className="font-medium text-sky-300 underline-offset-2 hover:underline">
               Sign in
             </a>{' '}
-            to keep it synced and use Focus.
+            to keep it synced and message Boss above.
           </p>
           <button
             type="button"
@@ -147,7 +146,7 @@ export function BossDashboard() {
             ))}
           </ul>
           <p className="mt-2 text-xs text-amber-100/75">
-            Open <strong className="font-medium text-amber-50/90">Focus</strong> — Boss can nudge you to
+            <strong className="font-medium text-amber-50/90">Message Boss</strong> above — Boss can nudge you to
             start (e.g. an assignment due tonight) without extra decisions from you.
           </p>
         </div>
@@ -156,10 +155,14 @@ export function BossDashboard() {
       {roles.length === 0 && (
         <div className="mt-6 rounded-xl border border-white/[0.06] bg-[var(--color-bg-panel)]/40 px-4 py-3 text-center text-sm text-[var(--color-text-muted)]">
           No roles yet. Use <strong className="text-[var(--color-text-primary)]">+ New role</strong> in
-          the sidebar to track work by hat. You can still use <strong className="text-[var(--color-text-primary)]">Focus</strong>{' '}
-          with your saved context.
+          the sidebar to track work by hat. You can still message <strong className="text-[var(--color-text-primary)]">Boss</strong>{' '}
+          above with your saved context.
         </div>
       )}
+
+      <div className="mt-8">
+        <BossChatTab />
+      </div>
 
       <nav
         className="mt-8 flex gap-1 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -182,8 +185,7 @@ export function BossDashboard() {
       </nav>
 
       <div className="mt-8">
-        {tab === 'chat' && <BossChatTab onOpenBrief={() => setTab('brief')} />}
-        {tab === 'brief' && <BossBriefTab setTab={setTab} />}
+        {tab === 'brief' && <BossBriefTab />}
         {tab === 'calendar' && <BossCalendarTab />}
         {tab === 'kpis' && <BossKpisTab />}
       </div>

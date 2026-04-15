@@ -1,1 +1,1 @@
-export type BossTab = 'chat' | 'brief' | 'calendar' | 'kpis'
+export type BossTab = 'brief' | 'calendar' | 'kpis'

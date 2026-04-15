@@ -36,10 +36,11 @@ function contextHasBody(ctx: AIContext): boolean {
 const LIST_EMPTY = 'Nothing listed yet.'
 
 type Props = {
-  onOpenFocus: () => void
+  /** Focus dashboard chat input, or navigate to Boss — optional; falls back to a /boss link when omitted. */
+  onJumpToChat?: () => void
 }
 
-export function BossContextBrief({ onOpenFocus }: Props) {
+export function BossContextBrief({ onJumpToChat }: Props) {
   const { aiContext, aiContextSetupComplete } = useAppState()
 
   const filled = useMemo(() => contextHasBody(aiContext), [aiContext])
@@ -61,13 +62,22 @@ export function BossContextBrief({ onOpenFocus }: Props) {
           >
             Quick setup
           </Link>
-          <button
-            type="button"
-            onClick={onOpenFocus}
-            className="rounded-xl border border-white/15 px-5 py-2.5 text-sm font-medium text-[var(--color-text-muted)] hover:bg-white/[0.04]"
-          >
-            Open Focus anyway
-          </button>
+          {onJumpToChat ? (
+            <button
+              type="button"
+              onClick={onJumpToChat}
+              className="rounded-xl border border-white/15 px-5 py-2.5 text-sm font-medium text-[var(--color-text-muted)] hover:bg-white/[0.04]"
+            >
+              Message Boss
+            </button>
+          ) : (
+            <Link
+              href="/boss"
+              className="inline-flex items-center justify-center rounded-xl border border-white/15 px-5 py-2.5 text-sm font-medium text-[var(--color-text-muted)] hover:bg-white/[0.04]"
+            >
+              Open Boss
+            </Link>
+          )}
         </div>
       </section>
     )
@@ -83,7 +93,7 @@ export function BossContextBrief({ onOpenFocus }: Props) {
             </h2>
             <p className="mt-1 max-w-xl text-xs text-[var(--color-text-muted)]">
               Finish setup at <Link href="/boss/context" className="text-sky-300 hover:underline">/boss/context</Link>{' '}
-              or tell Boss in Focus what to track.
+              or tell Boss from the dashboard what to track.
             </p>
           </div>
           <Link
@@ -119,13 +129,22 @@ export function BossContextBrief({ onOpenFocus }: Props) {
           >
             View context page
           </Link>
-          <button
-            type="button"
-            onClick={onOpenFocus}
-            className="rounded-lg bg-white/[0.08] px-3 py-1.5 text-xs font-medium text-[var(--color-text-primary)] hover:bg-white/[0.12]"
-          >
-            Adjust in Focus
-          </button>
+          {onJumpToChat ? (
+            <button
+              type="button"
+              onClick={onJumpToChat}
+              className="rounded-lg bg-white/[0.08] px-3 py-1.5 text-xs font-medium text-[var(--color-text-primary)] hover:bg-white/[0.12]"
+            >
+              Message Boss
+            </button>
+          ) : (
+            <Link
+              href="/boss"
+              className="rounded-lg bg-white/[0.08] px-3 py-1.5 text-xs font-medium text-[var(--color-text-primary)] hover:bg-white/[0.12]"
+            >
+              Open Boss
+            </Link>
+          )}
         </div>
       </div>
 
@@ -141,8 +160,8 @@ export function BossContextBrief({ onOpenFocus }: Props) {
           <WorkingList label="Avoiding" items={ws.avoiding} tone="slate" />
         </div>
         <p className="mt-3 text-[10px] text-[var(--color-text-faint)]">
-          In progress syncs from task statuses; mention urgent/blocked/avoiding in Focus or add them on
-          the context page — Boss sees this snapshot when you message. Simple rule: tackle{' '}
+          In progress syncs from task statuses; mention urgent/blocked/avoiding when you message Boss or add them on
+          the context page — Boss sees this snapshot. Simple rule: tackle{' '}
           <strong className="font-medium text-[var(--color-text-muted)]">urgent</strong> first, then keep{' '}
           <strong className="font-medium text-[var(--color-text-muted)]">in progress</strong> moving, and
           name what&apos;s <strong className="font-medium text-[var(--color-text-muted)]">blocked</strong>{' '}

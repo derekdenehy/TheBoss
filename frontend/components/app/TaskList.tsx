@@ -1,6 +1,7 @@
 'use client'
 
-import { useMemo, useState, type ReactNode } from 'react'
+import Link from 'next/link'
+import { useId, useMemo, useState, type ReactNode } from 'react'
 import { useTaskDoneCelebration } from '@/hooks/useTaskDoneCelebration'
 import { orderTasksForStatusColumn } from '@/lib/taskTree'
 import type { Task, TaskStatus } from '@/lib/types'
@@ -8,6 +9,9 @@ import { TaskDuration } from './TaskDuration'
 
 /** Natural flow: queue → focus → archive. */
 const DISPLAY_ORDER: TaskStatus[] = ['todo', 'in_progress', 'done']
+
+/** Global dashboard: active work first. */
+const GLOBAL_DISPLAY_ORDER: TaskStatus[] = ['in_progress', 'todo', 'done']
 
 const LABELS: Record<TaskStatus, string> = {
   todo: 'To do',
@@ -31,6 +35,114 @@ function CheckIcon({ className }: { className?: string }) {
   )
 }
 
+function ChevronDownIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="none" aria-hidden>
+      <path
+        d="M6 8l4 4 4-4"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function ChevronUpIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="none" aria-hidden>
+      <path
+        d="M6 12l4-4 4 4"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+/** Heuristic: title may not fit one line in the row layout. */
+function titleBenefitsFromExpand(title: string): boolean {
+  const t = title
+  return t.length > 44 || t.includes('\n')
+}
+
+function textareaRowsForTitle(title: string): number {
+  const lines = title.split('\n')
+  let rows = 0
+  for (const line of lines) {
+    rows += Math.max(1, Math.ceil(line.length / 72))
+  }
+  return Math.min(14, Math.max(3, rows))
+}
+
+function TaskTitleEditor({
+  taskId,
+  title,
+  expanded,
+  isDone,
+  isFocus,
+  onEditTitle,
+  onToggleExpand,
+}: {
+  taskId: string
+  title: string
+  expanded: boolean
+  isDone: boolean
+  isFocus: boolean
+  onEditTitle: (id: string, next: string) => void
+  onToggleExpand: (id: string) => void
+}) {
+  const showExpandToggle = titleBenefitsFromExpand(title) || expanded
+  const titleTone = isDone
+    ? 'text-[var(--color-text-muted)] line-through decoration-emerald-500/40'
+    : 'text-[var(--color-text-primary)]'
+  const titleSize = isFocus ? 'text-[15px] leading-snug sm:text-base' : 'text-sm'
+  const onTitleBlur = () => {
+    const t = title.trim()
+    if (t !== title) onEditTitle(taskId, t)
+  }
+
+  return (
+    <div className="flex min-w-0 items-start gap-1">
+      <div className="min-w-0 flex-1">
+        {expanded ? (
+          <textarea
+            className={`min-h-[5rem] w-full resize-y rounded-lg border border-white/10 bg-[var(--color-bg-deep)]/50 px-2 py-2 leading-snug outline-none ring-sky-500/0 transition placeholder:text-[var(--color-text-faint)] focus:border-sky-500/35 focus:ring-2 focus:ring-sky-500/25 ${titleTone} ${titleSize}`}
+            rows={textareaRowsForTitle(title)}
+            value={title}
+            onChange={(e) => onEditTitle(taskId, e.target.value)}
+            onBlur={onTitleBlur}
+            aria-label="Task title"
+          />
+        ) : (
+          <input
+            className={`block min-w-0 w-full max-w-full truncate bg-transparent outline-none placeholder:text-[var(--color-text-faint)] ${titleTone} ${titleSize}`}
+            value={title}
+            title={title}
+            onChange={(e) => onEditTitle(taskId, e.target.value)}
+            onBlur={onTitleBlur}
+            aria-label="Task title"
+          />
+        )}
+      </div>
+      {showExpandToggle && (
+        <button
+          type="button"
+          onClick={() => onToggleExpand(taskId)}
+          className="mt-0.5 shrink-0 rounded-md p-1 text-[var(--color-text-faint)] hover:bg-white/[0.08] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/35"
+          aria-expanded={expanded}
+          aria-label={expanded ? 'Collapse title' : 'Expand full title'}
+        >
+          {expanded ? <ChevronUpIcon className="h-4 w-4" /> : <ChevronDownIcon className="h-4 w-4" />}
+        </button>
+      )}
+    </div>
+  )
+}
+
 type Props = {
   tasks: Task[]
   onChangeStatus: (id: string, status: TaskStatus) => void
@@ -43,6 +155,12 @@ type Props = {
   inProgressPrimaryTitle?: string | null
   /** Modular workspace (notes / links / files) above the in-progress task list. */
   inProgressWorkspace?: ReactNode
+  /** When set, shows a role label per task and uses a flat layout for every column (Boss global list). */
+  getRoleLabel?: (task: Task) => string
+  /** Wrap role label in a link (e.g. `/boss/role/:id`). Only used when `getRoleLabel` is set. */
+  roleHrefForTask?: (task: Task) => string
+  /** Role workspace: only the To do column is collapsible; In progress / Done stay visible. */
+  collapsibleTodo?: boolean
 }
 
 export function TaskList({
@@ -54,20 +172,38 @@ export function TaskList({
   startHereTaskId,
   inProgressPrimaryTitle,
   inProgressWorkspace,
+  getRoleLabel,
+  roleHrefForTask,
+  collapsibleTodo = false,
 }: Props) {
   const { completingId, celebrateId, submitStatus } = useTaskDoneCelebration()
   const [subtaskParentId, setSubtaskParentId] = useState<string | null>(null)
   const [subtaskDraft, setSubtaskDraft] = useState('')
   /** When set, overrides auto collapse for the completed section. */
   const [doneOpenOverride, setDoneOpenOverride] = useState<boolean | undefined>(undefined)
+  /** Task ids showing full multiline title editor. */
+  const [expandedTitleIds, setExpandedTitleIds] = useState<Set<string>>(() => new Set())
+  const [todoSectionOpen, setTodoSectionOpen] = useState(true)
+  const todoPanelId = useId()
+
+  const toggleTitleExpanded = (id: string) => {
+    setExpandedTitleIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const displayOrder = getRoleLabel ? GLOBAL_DISPLAY_ORDER : DISPLAY_ORDER
 
   const grouped = useMemo(
     () =>
-      DISPLAY_ORDER.map((status) => ({
+      displayOrder.map((status) => ({
         status,
         rows: orderTasksForStatusColumn(tasks, status),
       })),
-    [tasks]
+    [tasks, displayOrder]
   )
 
   const counts = useMemo(() => {
@@ -86,32 +222,45 @@ export function TaskList({
         className="flex flex-wrap gap-2 rounded-xl border border-white/[0.08] bg-[var(--color-bg-panel)]/50 px-3 py-2.5"
         aria-label="Task counts"
       >
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.06] px-2.5 py-1 text-xs font-medium text-[var(--color-text-muted)]">
-          <span className="opacity-80">To do</span>
-          <span className="tabular-nums">{counts.todo}</span>
-        </span>
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500/14 px-2.5 py-1 text-xs font-medium text-amber-100/90">
-          <span className="opacity-80">In progress</span>
-          <span className="tabular-nums">{counts.in_progress}</span>
-        </span>
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/15 px-2.5 py-1 text-xs font-medium text-emerald-200/95">
-          <span className="opacity-80">Done</span>
-          <span className="tabular-nums text-emerald-100">{counts.done}</span>
-        </span>
+        {displayOrder.map((status) => (
+          <span
+            key={status}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium ${
+              status === 'todo'
+                ? 'bg-white/[0.06] text-[var(--color-text-muted)]'
+                : status === 'in_progress'
+                  ? 'bg-amber-500/14 text-amber-100/90'
+                  : 'bg-emerald-500/15 text-emerald-200/95'
+            }`}
+          >
+            <span className="opacity-80">
+              {status === 'done' ? 'Done' : LABELS[status]}
+            </span>
+            <span
+              className={`tabular-nums ${status === 'done' ? 'text-emerald-100' : ''}`}
+            >
+              {counts[status]}
+            </span>
+          </span>
+        ))}
       </div>
 
       {grouped.map(({ status, rows }) => {
         const isDone = status === 'done'
-        const isFocus = status === 'in_progress'
+        const inProgressChrome = status === 'in_progress' && getRoleLabel === undefined
+        const isFocus = inProgressChrome
         const showDoneToggle = isDone && rows.length > COLLAPSE_DONE_THRESHOLD
         const visibleRows = isDone && showDoneToggle && !doneSectionOpen ? [] : rows
+
+        const emptyInProgressMsg =
+          getRoleLabel !== undefined
+            ? 'Nothing in progress across your roles yet.'
+            : 'Nothing in progress yet—add a step in the workspace above or pull something from To do.'
 
         const sectionBody =
           rows.length === 0 ? (
             <p className="text-sm text-[var(--color-text-faint)]">
-              {isFocus
-                ? 'Nothing in progress yet—add a step in the workspace above or pull something from To do.'
-                : 'Nothing here.'}
+              {status === 'in_progress' ? emptyInProgressMsg : 'Nothing here.'}
             </p>
           ) : visibleRows.length === 0 ? (
             <p className="text-sm text-[var(--color-text-faint)]">
@@ -167,6 +316,22 @@ export function TaskList({
                       </button>
                     )}
                   <div className="min-w-0 flex-1">
+                    {getRoleLabel && (
+                      <span className="mb-1.5 block">
+                        {roleHrefForTask ? (
+                          <Link
+                            href={roleHrefForTask(task)}
+                            className="inline-flex rounded-md border border-white/[0.08] bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-300/90 hover:border-sky-500/35 hover:bg-sky-500/10"
+                          >
+                            {getRoleLabel(task)}
+                          </Link>
+                        ) : (
+                          <span className="inline-flex rounded-md border border-white/[0.08] bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                            {getRoleLabel(task)}
+                          </span>
+                        )}
+                      </span>
+                    )}
                     {startHereTaskId === task.id && (
                       <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-sky-300">
                         Start here
@@ -175,19 +340,14 @@ export function TaskList({
                     {subRowHint && (
                       <p className="mb-1 text-[10px] text-[var(--color-text-faint)]">{subRowHint}</p>
                     )}
-                    <input
-                      className={`min-w-0 w-full max-w-full bg-transparent text-sm outline-none placeholder:text-[var(--color-text-faint)] ${
-                        isDone
-                          ? 'text-[var(--color-text-muted)] line-through decoration-emerald-500/40'
-                          : 'text-[var(--color-text-primary)]'
-                      } ${isFocus ? 'text-[15px] leading-snug sm:text-base' : ''}`}
-                      value={task.title}
-                      onChange={(e) => onEditTitle(task.id, e.target.value)}
-                      onBlur={() => {
-                        const t = task.title.trim()
-                        if (t !== task.title) onEditTitle(task.id, t)
-                      }}
-                      aria-label="Task title"
+                    <TaskTitleEditor
+                      taskId={task.id}
+                      title={task.title}
+                      expanded={expandedTitleIds.has(task.id)}
+                      isDone={isDone}
+                      isFocus={isFocus}
+                      onEditTitle={onEditTitle}
+                      onToggleExpand={toggleTitleExpanded}
                     />
                     {subtaskParentId === task.id && (
                       <form
@@ -272,7 +432,7 @@ export function TaskList({
             </ul>
           )
 
-        if (isFocus) {
+        if (inProgressChrome) {
           return (
             <section key={status} className="space-y-3">
               <div className="rounded-2xl border border-amber-500/30 bg-gradient-to-b from-amber-500/[0.09] to-[var(--color-bg-panel)]/30 p-4 sm:p-5">
@@ -296,6 +456,46 @@ export function TaskList({
                 <div className={inProgressWorkspace ? 'mt-5 border-t border-amber-500/15 pt-5' : 'mt-4'}>
                   {sectionBody}
                 </div>
+              </div>
+            </section>
+          )
+        }
+
+        if (status === 'todo' && collapsibleTodo) {
+          return (
+            <section key={status} className="panel-card overflow-hidden border-white/[0.08]">
+              <button
+                type="button"
+                onClick={() => setTodoSectionOpen((o) => !o)}
+                className="flex w-full items-start justify-between gap-3 px-3 py-3 text-left transition hover:bg-white/[0.03] sm:px-4 sm:py-3.5"
+                aria-expanded={todoSectionOpen}
+                aria-controls={todoPanelId}
+              >
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+                    {LABELS[status]}
+                    <span className="ml-2 font-normal normal-case tracking-normal text-[var(--color-text-faint)]">
+                      · {rows.length}
+                    </span>
+                  </h3>
+                  <p className="mt-1 text-[11px] leading-snug text-[var(--color-text-muted)] sm:text-xs">
+                    {todoSectionOpen
+                      ? 'Queue next steps here; move work to In progress when you are on it.'
+                      : `${rows.length} queued — expand to view or edit.`}
+                  </p>
+                </div>
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-[var(--color-text-muted)]">
+                  <ChevronDownIcon
+                    className={`h-4 w-4 transition-transform duration-200 ${todoSectionOpen ? 'rotate-180' : ''}`}
+                  />
+                </span>
+              </button>
+              <div
+                id={todoPanelId}
+                hidden={!todoSectionOpen}
+                className="border-t border-white/[0.06] px-3 pb-4 pt-1 sm:px-4"
+              >
+                {sectionBody}
               </div>
             </section>
           )

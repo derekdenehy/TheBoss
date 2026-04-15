@@ -1,1 +1,1 @@
-export type BossTab = 'brief' | 'calendar' | 'kpis'
+export type BossTab = 'todos' | 'calendar' | 'kpis'

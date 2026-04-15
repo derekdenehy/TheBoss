@@ -8,19 +8,19 @@ import { getTodayKey } from '@/lib/dailyBoss'
 import { formatCoins, formatDuration } from '@/lib/earnings'
 import { DEFAULT_HOURLY_RATE } from '@/lib/types'
 import type { BossTab } from './bossDashboardTabs'
-import { BossBriefTab } from './BossBriefTab'
 import { BossCalendarTab } from './BossCalendarTab'
 import { BossChatTab } from './BossChatTab'
+import { BossGlobalTodosTab } from './BossGlobalTodosTab'
 import { BossKpisTab } from './BossKpisTab'
 
 const TABS: { id: BossTab; label: string }[] = [
-  { id: 'brief', label: 'Brief' },
+  { id: 'todos', label: 'To-dos' },
   { id: 'calendar', label: 'Calendar' },
   { id: 'kpis', label: 'KPIs' },
 ]
 
 export function BossDashboard() {
-  const [tab, setTab] = useState<BossTab>('brief')
+  const [tab, setTab] = useState<BossTab>('todos')
   const [saveBannerDismissed, setSaveBannerDismissed] = useState(false)
   const {
     hydrated,
@@ -185,7 +185,7 @@ export function BossDashboard() {
       </nav>
 
       <div className="mt-8">
-        {tab === 'brief' && <BossBriefTab />}
+        {tab === 'todos' && <BossGlobalTodosTab />}
         {tab === 'calendar' && <BossCalendarTab />}
         {tab === 'kpis' && <BossKpisTab />}
       </div>

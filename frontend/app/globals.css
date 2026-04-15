@@ -574,6 +574,149 @@ html[data-arena='boss'] .focus\:border-sky-500\/50:focus {
   border-color: color-mix(in srgb, rgb(248 113 113) 45%, transparent) !important;
 }
 
+/* Clock-out: mission-complete style session summary */
+@keyframes session-reward-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes session-reward-modal-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.88) translateY(24px);
+    filter: brightness(1.2) saturate(1.2);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.02) translateY(0);
+    filter: brightness(1.08) saturate(1.1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: brightness(1) saturate(1);
+  }
+}
+
+@keyframes session-reward-glow-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes session-reward-stat-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes session-reward-quest-row-in {
+  from {
+    opacity: 0;
+    transform: translateX(-28px) scale(0.94);
+    filter: brightness(1.4);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    filter: brightness(1);
+  }
+}
+
+@keyframes session-reward-shine-sweep {
+  0% {
+    transform: translateX(-120%) skewX(-12deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.35;
+  }
+  45% {
+    opacity: 0.2;
+  }
+  100% {
+    transform: translateX(120%) skewX(-12deg);
+    opacity: 0;
+  }
+}
+
+@keyframes session-reward-confetti-fall {
+  0% {
+    transform: translate3d(0, -8%, 0) rotate(0deg);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--session-cx, 0), 110vh, 0) rotate(var(--session-cr, 720deg));
+    opacity: 0.85;
+  }
+}
+
+.session-reward-backdrop {
+  animation: session-reward-backdrop-in 0.35s ease-out forwards;
+}
+
+.session-reward-modal-shell {
+  animation: session-reward-modal-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  opacity: 0;
+}
+
+.session-reward-glow-orb {
+  animation: session-reward-glow-pulse 2.8s ease-in-out infinite;
+}
+
+.session-reward-stat-tile {
+  animation: session-reward-stat-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  opacity: 0;
+}
+
+.session-reward-quest-row {
+  animation: session-reward-quest-row-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-fill-mode: both;
+  opacity: 0;
+}
+
+.session-reward-shine {
+  animation: session-reward-shine-sweep 1.4s ease-in-out 0.4s forwards;
+}
+
+.session-reward-confetti-piece {
+  animation: session-reward-confetti-fall var(--session-cd, 2.8s) linear forwards;
+  animation-delay: var(--session-cdel, 0s);
+}
+
+@keyframes session-reward-xp-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.session-reward-xp-inner {
+  transform-origin: left center;
+  transform: scaleX(0);
+  animation: session-reward-xp-grow 1.05s cubic-bezier(0.22, 1, 0.36, 1) 0.42s forwards;
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   * {
@@ -589,5 +732,31 @@ html[data-arena='boss'] .focus\:border-sky-500\/50:focus {
   .task-done-burst-root,
   .task-done-burst-root * {
     animation: none !important;
+  }
+
+  .session-reward-backdrop,
+  .session-reward-modal-shell,
+  .session-reward-glow-orb,
+  .session-reward-stat-tile,
+  .session-reward-quest-row,
+  .session-reward-shine,
+  .session-reward-confetti-piece,
+  .session-reward-xp-inner {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .session-reward-confetti-piece {
+    opacity: 0 !important;
+    visibility: hidden !important;
+  }
+
+  .session-reward-shine {
+    opacity: 0 !important;
+  }
+
+  .session-reward-xp-inner {
+    transform: scaleX(1) !important;
   }
 }
